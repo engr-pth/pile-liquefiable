@@ -175,7 +175,6 @@ with tab_ex3:
     sigma_v0_4m = 28.0
     p_prime = ((1 + 2 * K_0) / 3) * sigma_v0_4m
 
-    # Eq. (2.2) / (6.20): p' must be in MPa
     G_0 = 100 * (((3 - e_silty) ** 2) / (1 + e_silty)) * np.sqrt(p_prime / 1000.0)
 
     z_mid = 4.0
@@ -247,45 +246,41 @@ with tab_ex3:
 with tab_ex4:
     st.subheader("6.3.2 Example 4: Effective Length and Flexibility of the Pile")
 
-    # 6.3.2.1 Effective Length Calculation
+    # Dynamic calculation at depth z = D_0
     D_i = D_0 - (2 * t_wall)  # Inner diameter (m)
     
-    # Corrected Young's Modulus for Hollow Steel Pile (Eq. 2.47 / 6.33)
+    # Corrected Young's Modulus for Hollow Steel Pile
     E_p_corrected = E_steel / ((D_0**4) / (D_0**4 - D_i**4))  # GPa
 
-    # Soil Modulus at depth D0 = 0.75m
-    sigma_v0_D0 = 5.25  # kPa at z=0.75m (γ'_silty * 0.75m = 7.0 kN/m³ * 0.75m)
-    p_prime_D0 = ((1 + 2 * K_0) / 3) * sigma_v0_D0  # Eq. 6.34 (3.36 kPa)
+    # Overburden stress at depth z = D_0 m (γ'_silty = 7.0 kN/m³)
+    sigma_v0_D0 = 7.0 * D_0  
+    K_0 = 0.46
+    p_prime_D0 = ((1 + 2 * K_0) / 3) * sigma_v0_D0  # Eq. 6.34
     
     # Eq. (2.2) / (6.35): p' in MPa unit
     p_prime_D0_MPa = p_prime_D0 / 1000.0
-    G_0_D0 = 100 * (((3 - e_silty) ** 2) / (1 + e_silty)) * np.sqrt(p_prime_D0_MPa)  # Eq. 6.35 (13.45 MPa)
+    G_0_D0 = 100 * (((3 - e_silty) ** 2) / (1 + e_silty)) * np.sqrt(p_prime_D0_MPa)  # Eq. 6.35
     
-    # Stiffness degradation ratio from Example 3 (0.2 / 20%)
-    G_s_D0 = 0.2 * G_0_D0  # Eq. 6.36 (2.69 MPa)
-    E_sD = 3 * G_s_D0      # Eq. 6.37 (8.07 MPa, under undrained condition)
+    # Degradation ratio from Example 3
+    G_s_D0 = G_ratio * G_0_D0  # Eq. 6.36
+    E_sD = 3 * G_s_D0          # Eq. 6.37
 
-    # Parabolic stiffness variation effective length (Eq. 2.9 / 6.38)
+    # Effective active length
     L_ad = 2 * D_0 * ((E_p_corrected * 1e9) / (E_sD * 1e6)) ** 0.22  # m
 
-    # 6.3.2.2 Flexibility Calculation (Eq. 2.11 & 2.12)
-    # Flexural Rigidity E_p * I_p (N.m²)
+    # Flexibility calculations
     I_p = (np.pi / 64) * (D_0**4 - D_i**4)
     E_I = (E_steel * 1e9) * I_p  # N.m²
 
-    # Gradient of soil modulus k (kN/m³)
     k_lower = 200.0   # kN/m³
     k_upper = 2000.0  # kN/m³
 
-    # Lower k value
     T_u = ((E_I) / (k_lower * 1e3)) ** 0.2  # Eq. 6.39
     Z_L = L_p / T_u                         # Eq. 6.40
 
-    # Upper k value
     T_l = ((E_I) / (k_upper * 1e3)) ** 0.2  # Eq. 6.41
     Z_u = L_p / T_l                         # Eq. 6.42
 
-    # Behavior Classification
     def classify_behavior(z_val):
         if z_val > 5.0:
             return "Flexible"
@@ -294,10 +289,10 @@ with tab_ex4:
         else:
             return "Rigid"
 
-    # Display Metrics
+    # Metrics Display
     col_e1, col_e2, col_e3, col_e4 = st.columns(4)
     col_e1.metric("Corrected Pile Modulus ($E_{p,corr}$)", f"{E_p_corrected:.1f} GPa")
-    col_e2.metric("Soil Modulus at $D_0$ ($E_{sD}$)", f"{E_sD:.2f} MPa")
+    col_e2.metric(f"Soil Modulus at Depth {D_0:.2f}m ($E_{{sD}}$)", f"{E_sD:.2f} MPa")
     col_e3.metric("Effective Active Length ($L_{ad}$)", f"{L_ad:.2f} m")
     col_e4.metric("Pile Penetration in Sand", f"{max(0.0, L_ad - H_layer):.2f} m")
 
@@ -310,13 +305,14 @@ with tab_ex4:
     st.markdown("---")
     st.markdown("#### 📐 Example 4 Calculation Summary")
 
+    # Dynamic Table Labels
     ex4_summary_df = pd.DataFrame({
         "Parameter": [
             "Corrected Young's Modulus of Hollow Steel Pile (E_p_corrected)",
-            "Effective Mean Confining Stress at Depth D₀=0.75m (p')",
-            "Small-strain Shear Modulus at D₀ (G₀)",
-            "Degraded Shear Modulus at D₀ (G_s)",
-            "Soil Young's Modulus at Depth D₀ (E_sD)",
+            f"Effective Mean Confining Stress at Depth D₀={D_0:.2f}m (p')",
+            f"Small-strain Shear Modulus at Depth D₀={D_0:.2f}m (G₀)",
+            f"Degraded Shear Modulus at Depth D₀={D_0:.2f}m (G_s)",
+            f"Soil Young's Modulus at Depth D₀={D_0:.2f}m (E_sD)",
             "Effective Active Pile Length (L_ad)",
             "Elastic Length for k = 200 kN/m³ (T_u)",
             "Dimensionless Length Z_L (L / T_u)",
