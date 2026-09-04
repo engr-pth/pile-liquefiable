@@ -1,7 +1,6 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
-from scipy.optimize import fsolve
 
 st.set_page_config(page_title="Pile Foundation Design", layout="wide")
 
@@ -36,12 +35,24 @@ depths = np.arange(0, 21, 1)
 sigma_v0 = [0, 7, 14, 21, 28, 35, 42, 49, 56, 81, 90, 99, 108, 117, 126, 135, 144, 153, 162, 171, 180]
 qc_values = [0, 0.74, 1.19, 1.81, 1.82, 2.41, 2.79, 3.25, 3.43, 12.85, 13.77, 16.03, 17.94, 19.07, 17.88, 24.94, 20.93, 23.71, 22.97, 26.59, 28.89]
 
-# Helper function for trapezoidal integration (compatible with numpy 2.0+)
+# Helper function for trapezoidal integration
 def integrate_trapz(y, x):
     try:
         return np.trapezoid(y, x)
     except AttributeError:
         return np.trapz(y, x)
+
+# Helper function for solving non-linear strain (Pure Python Binary Search)
+def solve_shear_strain(tau_target, G0_kpa, gamma_r=2e-4, c=0.79):
+    low, high = 1e-6, 0.1
+    for _ in range(100):
+        mid = (low + high) / 2.0
+        tau_calc = G0_kpa * (mid / ((1 + (mid / gamma_r)) ** c))
+        if tau_calc < tau_target:
+            low = mid
+        else:
+            high = mid
+    return mid
 
 # ---------------------------------------------------------
 # Main Tabs (Example 1, Example 2, Example 3)
@@ -58,19 +69,15 @@ tab_ex1, tab_ex2, tab_ex3 = st.tabs([
 with tab_ex1:
     st.subheader("6.2.1 Preliminary Design under Static Loading")
     
-    # End Bearing Calculation
     A_b = (np.pi / 4) * (D_0 ** 2)
-    sigma_b_eff = (17 * 8) + (19 * 12) - (20 * 10)  # Effective vertical stress at 20m depth
-    N_q = 40  # Nq for friction angle 32 deg
+    sigma_b_eff = (17 * 8) + (19 * 12) - (20 * 10)
+    N_q = 40
     Q_b_ex1 = A_b * sigma_b_eff * (N_q - 1)
     
-    # Shaft Resistance Calculation
     Q_s_ex1 = np.pi * D_0 * ((0.5 * 1.27 * (8**2)) + (0.5 * 3.28 * (20**2 - 8**2)))
-    
     Q_u_ex1 = Q_b_ex1 + Q_s_ex1
     N_required_ex1 = (P_axial * 1000) / Q_u_ex1
 
-    # Results Display using Metric Cards
     res_col1, res_col2, res_col3, res_col4 = st.columns(4)
     res_col1.metric("Base Capacity ($Q_b$)", f"{Q_b_ex1:.0f} kN")
     res_col2.metric("Shaft Capacity ($Q_s$)", f"{Q_s_ex1:.0f} kN")
@@ -90,7 +97,6 @@ with tab_ex2:
     q_b_cpt = qb_qc_ratio * qc_tip_book
     Q_b_ex2 = q_b_cpt * ((np.pi / 4) * (D_0 ** 2)) * 1000
 
-    # 1. MTD Method
     tau_s_mtd = []
     for z, sig_v, qc in zip(depths, sigma_v0, qc_values):
         if z == 0:
@@ -104,7 +110,6 @@ with tab_ex2:
     Q_u_mtd = Q_b_ex2 + Q_s_mtd
     N_piles_mtd = (P_axial * 1000) / Q_u_mtd
 
-    # 2. Randolph et al. Method
     K_max_list = []
     tau_s_randolph = []
     for z, sig_v, qc in zip(depths, sigma_v0, qc_values):
@@ -163,44 +168,32 @@ with tab_ex2:
 with tab_ex3:
     st.subheader("6.3.1 Example 3: Soil Stiffness and Natural Frequency")
 
-    # 1. Effective Stress & Small-Strain Shear Modulus (Eq 6.19 & 6.20)
     K_0 = 0.46
-    sigma_v0_4m = 28.0  # kPa at z=4m (mid-depth of silty sand layer)
-    p_prime = ((1 + 2 * K_0) / 3) * sigma_v0_4m  # Eq 6.19 (kPa)
+    sigma_v0_4m = 28.0
+    p_prime = ((1 + 2 * K_0) / 3) * sigma_v0_4m
 
-    # G_0 calculation (Hardin & Drnevich, Eq 2.2 / 6.20)
-    G_0 = 100 * (((3 - e_silty) ** 2) / (1 + e_silty)) * np.sqrt(p_prime / 1000)  # MPa
+    G_0 = 100 * (((3 - e_silty) ** 2) / (1 + e_silty)) * np.sqrt(p_prime / 1000)
 
-    # 2. Maximum Cyclic Shear Stress (Eq 6.21 & 6.22)
     z_mid = 4.0
     r_d = 1 - 0.01 * z_mid
-    sigma_v0_tot_4m = 68.0  # total stress at z=4m (kPa)
-    tau_max = 0.65 * a_g * sigma_v0_tot_4m * r_d  # kPa (Eq 6.22)
+    sigma_v0_tot_4m = 68.0
+    tau_max = 0.65 * a_g * sigma_v0_tot_4m * r_d
 
-    # 3. Nonlinear Shear Strain Iteration (Eq 6.25 & 6.26)
-    gamma_r = 2e-4  # Reference strain (0.02%)
+    gamma_r = 2e-4
     c_exponent = 0.79
 
-    def eq_strain(gamma):
-        # tau_max in kPa, G_0 in kPa
-        return (G_0 * 1000) * (gamma / ((1 + (gamma / gamma_r)) ** c_exponent)) - tau_max
-
-    gamma_sol = fsolve(eq_strain, 0.001)[0]
+    gamma_sol = solve_shear_strain(tau_max, G_0 * 1000, gamma_r, c_exponent)
     gamma_percent = gamma_sol * 100
 
-    # Degradation and Secant Shear Modulus (Eq 6.28)
     G_ratio = 1 / ((1 + (gamma_sol / gamma_r)) ** c_exponent)
-    G_s = G_ratio * G_0  # MPa
+    G_s = G_ratio * G_0
 
-    # Young's Modulus under undrained condition (nu = 0.5) (Eq 6.29 & 6.30)
     nu = 0.5
-    E_s = 2 * G_s * (1 + nu)  # MPa
+    E_s = 2 * G_s * (1 + nu)
 
-    # 4. Shear Wave Velocity & Natural Frequency (Eq 6.31 & 6.32)
-    v_s = np.sqrt((G_s * 1e6) / rho_soil)  # m/s
-    f_n = v_s / (4 * H_layer)  # Hz
+    v_s = np.sqrt((G_s * 1e6) / rho_soil)
+    f_n = v_s / (4 * H_layer)
 
-    # Display Metrics
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Confining Stress ($p'$)", f"{p_prime:.1f} kPa")
     m2.metric("Max Shear Stress ($\\tau_{max}$)", f"{tau_max:.2f} kPa")
