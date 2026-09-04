@@ -175,7 +175,8 @@ with tab_ex3:
     sigma_v0_4m = 28.0
     p_prime = ((1 + 2 * K_0) / 3) * sigma_v0_4m
 
-    G_0 = 100 * (((3 - e_silty) ** 2) / (1 + e_silty)) * np.sqrt(p_prime / 1000)
+    # Eq. (2.2) / (6.20): p' must be in MPa
+    G_0 = 100 * (((3 - e_silty) ** 2) / (1 + e_silty)) * np.sqrt(p_prime / 1000.0)
 
     z_mid = 4.0
     r_d = 1 - 0.01 * z_mid
@@ -198,9 +199,9 @@ with tab_ex3:
     f_n = v_s / (4 * H_layer)
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Confining Stress ($p'$)", f"{p_prime:.1f} kPa")
+    m1.metric("Confining Stress ($p'$)", f"{p_prime:.2f} kPa")
     m2.metric("Max Shear Stress ($\\tau_{max}$)", f"{tau_max:.2f} kPa")
-    m3.metric("Initial Shear Modulus ($G_0$)", f"{G_0:.1f} MPa")
+    m3.metric("Initial Shear Modulus ($G_0$)", f"{G_0:.2f} MPa")
     m4.metric("Shear Strain ($\\gamma$)", f"{gamma_percent:.3f} %")
 
     m5, m6, m7, m8 = st.columns(4)
@@ -234,7 +235,7 @@ with tab_ex3:
             f"{f_n:.2f} Hz"
         ],
         "Equation Reference": [
-            "Eq. (6.19)", "Eq. (6.20)", "Eq. (6.22)", "Eq. (6.26)", 
+            "Eq. (6.19)", "Eq. (6.20) / (2.2)", "Eq. (6.22)", "Eq. (6.26)", 
             "Eq. (6.28)", "Eq. (6.30)", "Eq. (6.31)", "Eq. (6.32)"
         ]
     })
@@ -253,9 +254,12 @@ with tab_ex4:
     E_p_corrected = E_steel / ((D_0**4) / (D_0**4 - D_i**4))  # GPa
 
     # Soil Modulus at depth D0 = 0.75m
-    sigma_v0_D0 = 7.0  # kPa at z=0.75m
+    sigma_v0_D0 = 5.25  # kPa at z=0.75m (γ'_silty * 0.75m = 7.0 kN/m³ * 0.75m)
     p_prime_D0 = ((1 + 2 * K_0) / 3) * sigma_v0_D0  # Eq. 6.34 (3.36 kPa)
-    G_0_D0 = 100 * (((3 - e_silty) ** 2) / (1 + e_silty)) * np.sqrt(p_prime_D0 / 1000)  # Eq. 6.35 (13.45 MPa)
+    
+    # Eq. (2.2) / (6.35): p' in MPa unit
+    p_prime_D0_MPa = p_prime_D0 / 1000.0
+    G_0_D0 = 100 * (((3 - e_silty) ** 2) / (1 + e_silty)) * np.sqrt(p_prime_D0_MPa)  # Eq. 6.35 (13.45 MPa)
     
     # Stiffness degradation ratio from Example 3 (0.2 / 20%)
     G_s_D0 = 0.2 * G_0_D0  # Eq. 6.36 (2.69 MPa)
@@ -332,7 +336,7 @@ with tab_ex4:
             f"{Z_u:.2f} ({classify_behavior(Z_u)})"
         ],
         "Equation Reference": [
-            "Eq. (6.33) / (2.47)", "Eq. (6.34)", "Eq. (6.35)", "Eq. (6.36)", 
+            "Eq. (6.33) / (2.47)", "Eq. (6.34)", "Eq. (6.35) / (2.2)", "Eq. (6.36)", 
             "Eq. (6.37)", "Eq. (6.38) / (2.9)", "Eq. (6.39) / (2.11)", 
             "Eq. (6.40) / (2.12)", "Eq. (6.41) / (2.11)", "Eq. (6.42) / (2.12)"
         ]
