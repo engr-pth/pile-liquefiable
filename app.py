@@ -1,6 +1,7 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="Pile Foundation Design", layout="wide")
 
@@ -58,7 +59,7 @@ for z, sig_v, qc in zip(depths, sigma_v0, qc_values):
         tau_s_mtd.append(round(tau, 2))
 
 # Integration for MTD (Eq 6.13)
-int_tau_mtd = np.trapz(tau_s_mtd, depths)
+int_tau_mtd = np.trapezoid(tau_s_mtd, depths)
 Q_s_mtd = np.pi * D_0 * int_tau_mtd
 Q_u_mtd = Q_b + Q_s_mtd
 N_piles_mtd = (P_axial * 1000) / Q_u_mtd
@@ -82,7 +83,7 @@ for z, sig_v, qc in zip(depths, sigma_v0, qc_values):
         tau_s_randolph.append(round(tau, 2))
 
 # Integration for Randolph (Eq 6.17)
-int_tau_randolph = np.trapz(tau_s_randolph, depths)
+int_tau_randolph = np.trapezoid(tau_s_randolph, depths)
 Q_s_randolph = np.pi * D_0 * int_tau_randolph
 Q_u_randolph = Q_b + Q_s_randolph
 
