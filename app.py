@@ -17,11 +17,13 @@ with st.expander("📌 **Input Parameters**", expanded=True):
         D_0 = st.number_input("Pile Diameter, $D_0$ (m)", value=0.75, step=0.05)
         L_p = st.number_input("Pile Length, $L_p$ (m)", value=20.0, step=1.0)
         e_silty = st.number_input("Void Ratio (Silty Sand), $e$", value=0.9, step=0.05)
+        t_wall = st.number_input("Pile Wall Thickness, $t$ (m)", value=0.012, step=0.001)
     
     with col2:
         P_axial = st.number_input("Axial Load (MN)", value=9.4, step=0.1)
         d_cone = st.number_input("Cone Diameter (mm)", value=25.4, step=0.1)
         a_g = st.number_input("Peak Ground Acceleration, $a_g$ (g)", value=0.2, step=0.05)
+        E_steel = st.number_input("Steel Young's Modulus, $E_p$ (GPa)", value=210.0, step=5.0)
         
     with col3:
         delta_cv = st.number_input("Interface Friction Angle (°)", value=20.0, step=1.0)
@@ -55,12 +57,13 @@ def solve_shear_strain(tau_target, G0_kpa, gamma_r=2e-4, c=0.79):
     return mid
 
 # ---------------------------------------------------------
-# Main Tabs (Example 1, Example 2, Example 3)
+# Main Tabs (Example 1, Example 2, Example 3, Example 4)
 # ---------------------------------------------------------
-tab_ex1, tab_ex2, tab_ex3 = st.tabs([
+tab_ex1, tab_ex2, tab_ex3, tab_ex4 = st.tabs([
     "📌 Example 1: Static Loading", 
     "📊 Example 2: CPT Methods (MTD & Randolph)", 
-    "🌊 Example 3: Dynamic Soil Stiffness & $f_n$"
+    "🌊 Example 3: Dynamic Soil Stiffness & $f_n$",
+    "📏 Example 4: Effective Length & Flexibility"
 ])
 
 # =========================================================
@@ -236,3 +239,104 @@ with tab_ex3:
         ]
     })
     st.table(summary_df)
+
+# =========================================================
+# EXAMPLE 4
+# =========================================================
+with tab_ex4:
+    st.subheader("6.3.2 Example 4: Effective Length and Flexibility of the Pile")
+
+    # 6.3.2.1 Effective Length Calculation
+    D_i = D_0 - (2 * t_wall)  # Inner diameter (m)
+    
+    # Corrected Young's Modulus for Hollow Steel Pile (Eq. 2.47 / 6.33)
+    E_p_corrected = E_steel / ((D_0**4) / (D_0**4 - D_i**4))  # GPa
+
+    # Soil Modulus at depth D0 = 0.75m
+    sigma_v0_D0 = 7.0  # kPa at z=0.75m
+    p_prime_D0 = ((1 + 2 * K_0) / 3) * sigma_v0_D0  # Eq. 6.34 (3.36 kPa)
+    G_0_D0 = 100 * (((3 - e_silty) ** 2) / (1 + e_silty)) * np.sqrt(p_prime_D0 / 1000)  # Eq. 6.35 (13.45 MPa)
+    
+    # Stiffness degradation ratio from Example 3 (0.2 / 20%)
+    G_s_D0 = 0.2 * G_0_D0  # Eq. 6.36 (2.69 MPa)
+    E_sD = 3 * G_s_D0      # Eq. 6.37 (8.07 MPa, under undrained condition)
+
+    # Parabolic stiffness variation effective length (Eq. 2.9 / 6.38)
+    L_ad = 2 * D_0 * ((E_p_corrected * 1e9) / (E_sD * 1e6)) ** 0.22  # m
+
+    # 6.3.2.2 Flexibility Calculation (Eq. 2.11 & 2.12)
+    # Flexural Rigidity E_p * I_p (N.m²)
+    I_p = (np.pi / 64) * (D_0**4 - D_i**4)
+    E_I = (E_steel * 1e9) * I_p  # N.m²
+
+    # Gradient of soil modulus k (kN/m³)
+    k_lower = 200.0   # kN/m³
+    k_upper = 2000.0  # kN/m³
+
+    # Lower k value
+    T_u = ((E_I) / (k_lower * 1e3)) ** 0.2  # Eq. 6.39
+    Z_L = L_p / T_u                         # Eq. 6.40
+
+    # Upper k value
+    T_l = ((E_I) / (k_upper * 1e3)) ** 0.2  # Eq. 6.41
+    Z_u = L_p / T_l                         # Eq. 6.42
+
+    # Behavior Classification
+    def classify_behavior(z_val):
+        if z_val > 5.0:
+            return "Flexible"
+        elif 2.5 <= z_val <= 5.0:
+            return "Semi-Flexible"
+        else:
+            return "Rigid"
+
+    # Display Metrics
+    col_e1, col_e2, col_e3, col_e4 = st.columns(4)
+    col_e1.metric("Corrected Pile Modulus ($E_{p,corr}$)", f"{E_p_corrected:.1f} GPa")
+    col_e2.metric("Soil Modulus at $D_0$ ($E_{sD}$)", f"{E_sD:.2f} MPa")
+    col_e3.metric("Effective Active Length ($L_{ad}$)", f"{L_ad:.2f} m")
+    col_e4.metric("Pile Penetration in Sand", f"{max(0.0, L_ad - H_layer):.2f} m")
+
+    col_e5, col_e6, col_e7, col_e8 = st.columns(4)
+    col_e5.metric("Flexibility Elastic Length ($T_u$, k=200)", f"{T_u:.3f} m")
+    col_e6.metric("Relative Length ($Z_L$)", f"{Z_L:.2f} ({classify_behavior(Z_L)})")
+    col_e7.metric("Flexibility Elastic Length ($T_l$, k=2000)", f"{T_l:.3f} m")
+    col_e8.metric("Relative Length ($Z_u$)", f"{Z_u:.2f} ({classify_behavior(Z_u)})")
+
+    st.markdown("---")
+    st.markdown("#### 📐 Example 4 Calculation Summary")
+
+    ex4_summary_df = pd.DataFrame({
+        "Parameter": [
+            "Corrected Young's Modulus of Hollow Steel Pile (E_p_corrected)",
+            "Effective Mean Confining Stress at Depth D₀=0.75m (p')",
+            "Small-strain Shear Modulus at D₀ (G₀)",
+            "Degraded Shear Modulus at D₀ (G_s)",
+            "Soil Young's Modulus at Depth D₀ (E_sD)",
+            "Effective Active Pile Length (L_ad)",
+            "Elastic Length for k = 200 kN/m³ (T_u)",
+            "Dimensionless Length Z_L (L / T_u)",
+            "Elastic Length for k = 2000 kN/m³ (T_l)",
+            "Dimensionless Length Z_u (L / T_l)"
+        ],
+        "Value": [
+            f"{E_p_corrected:.1f} GPa",
+            f"{p_prime_D0:.2f} kPa",
+            f"{G_0_D0:.2f} MPa",
+            f"{G_s_D0:.2f} MPa",
+            f"{E_sD:.2f} MPa",
+            f"{L_ad:.2f} m",
+            f"{T_u:.3f} m",
+            f"{Z_L:.2f} ({classify_behavior(Z_L)})",
+            f"{T_l:.3f} m",
+            f"{Z_u:.2f} ({classify_behavior(Z_u)})"
+        ],
+        "Equation Reference": [
+            "Eq. (6.33) / (2.47)", "Eq. (6.34)", "Eq. (6.35)", "Eq. (6.36)", 
+            "Eq. (6.37)", "Eq. (6.38) / (2.9)", "Eq. (6.39) / (2.11)", 
+            "Eq. (6.40) / (2.12)", "Eq. (6.41) / (2.11)", "Eq. (6.42) / (2.12)"
+        ]
+    })
+    st.table(ex4_summary_df)
+
+    st.info(f"📌 **Interpretation:** The true behavior of the pile lies between **{classify_behavior(Z_L)}** and **{classify_behavior(Z_u)}** depending on the actual soil modulus gradient $k$.")
