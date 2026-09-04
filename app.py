@@ -4,8 +4,8 @@ import pandas as pd
 
 st.set_page_config(page_title="Pile Foundation Design", layout="wide")
 
-st.title("🏗️ Pile Foundation Design in Liquefiable Soils")
-st.caption("Supports Steel Pipe & Bored Concrete Piles with Dynamic MSF Option")
+st.title("🏗️ Pile Foundation Design in Liquefiable & Various Soils")
+st.caption("Supports Multiple Soil Profiles, MSF Options & Pile Types")
 
 # ---------------------------------------------------------
 # Step 1: Input Parameters
@@ -17,7 +17,12 @@ with st.expander("📌 **Input Parameters**", expanded=True):
         pile_type = st.selectbox("Select Pile Type", ["Steel Pipe Pile", "Bored Concrete Pile"])
         D_0 = st.number_input("Pile Diameter, $D_0$ (m)", value=0.75, step=0.05)
         L_p = st.number_input("Pile Length, $L_p$ (m)", value=20.0, step=1.0)
-        e_silty = st.number_input("Void Ratio (Silty Sand), $e$", value=0.9, step=0.05)
+        
+        # Soil Profile Selection Added
+        soil_profile = st.selectbox(
+            "Select Soil Profile Type", 
+            ["Parabolic (Sand / Silty Sand)", "Linear (Soft Clay)", "Constant (Over-consolidated Clay)"]
+        )
 
     with col2:
         P_axial = st.number_input("Axial Load (MN)", value=9.4, step=0.1)
@@ -38,7 +43,8 @@ with st.expander("📌 **Input Parameters**", expanded=True):
     with col3:
         delta_cv = st.number_input("Interface Friction Angle (°)", value=default_delta, step=1.0)
         rho_soil = st.number_input("Soil Density, $\\rho$ (kg/m³)", value=1700.0, step=50.0)
-        H_layer = st.number_input("Silty Sand Layer Thickness, $H$ (m)", value=8.0, step=0.5)
+        H_layer = st.number_input("Soil Layer Thickness, $H$ (m)", value=8.0, step=0.5)
+        e_silty = st.number_input("Void Ratio, $e$", value=0.90, step=0.05)
 
     st.markdown("---")
     st.markdown("##### 🌊 Earthquake Magnitude & Scaling Options")
@@ -75,7 +81,7 @@ def solve_shear_strain(tau_target, G0_kpa, gamma_r=2e-4, c=0.79):
     return mid
 
 # ---------------------------------------------------------
-# Dynamic Shear Stress Calculation (with optional MSF)
+# Dynamic Shear Stress Calculation
 # ---------------------------------------------------------
 K_0 = 0.46
 sigma_v0_4m = 28.0
@@ -87,7 +93,6 @@ r_d = 1 - 0.01 * z_mid
 tau_max_raw = 0.65 * a_g * 68.0 * r_d
 
 if apply_msf:
-    # Idriss MSF formula
     MSF = 6.9 * np.exp(-M_w / 4.0) - 0.058
     tau_max = tau_max_raw / MSF
 else:
@@ -193,6 +198,17 @@ with tab_ex3:
 with tab_ex4:
     st.subheader(f"6.3.2 Example 4: Effective Length and Flexibility ({pile_type})")
 
+    # Soil Profile Power Factor Selection (Gazetas 1984 / Eq. 2.8 - 2.10)
+    if "Parabolic" in soil_profile:
+        exponent = 0.22
+        st.caption("🌐 **Profile Selection:** Parabolic Variation ($L_{ad} = 2D_0 (E_p / E_{sD})^{0.22}$)")
+    elif "Linear" in soil_profile:
+        exponent = 0.20
+        st.caption("🌐 **Profile Selection:** Linear Variation ($L_{ad} = 2D_0 (E_p / E_{sD})^{0.20}$)")
+    else:
+        exponent = 0.25
+        st.caption("🌐 **Profile Selection:** Constant Variation ($L_{ad} = 2D_0 (E_p / E_{sD})^{0.25}$)")
+
     if pile_type == "Steel Pipe Pile":
         D_i = D_0 - (2 * t_wall)
         E_p_corrected = E_pile / ((D_0**4) / (D_0**4 - D_i**4))
@@ -211,7 +227,8 @@ with tab_ex4:
     G_s_D0 = G_ratio * G_0_D0  
     E_sD = 3 * G_s_D0          
 
-    L_ad = 2 * D_0 * ((E_p_corrected * 1e9) / (E_sD * 1e6)) ** 0.22
+    # Effective Active Length with dynamic exponent
+    L_ad = 2 * D_0 * ((E_p_corrected * 1e9) / (E_sD * 1e6)) ** exponent
     E_I = (E_pile * 1e9) * I_p
 
     k_lower, k_upper = 200.0, 2000.0
@@ -245,6 +262,8 @@ with tab_ex4:
     ex4_summary_df = pd.DataFrame({
         "Parameter": [
             "Pile Type Selected",
+            "Soil Profile Type",
+            "Exponent Used for L_ad",
             "MSF Option Status",
             "Effective Young's Modulus of Pile Section (E_p)",
             f"Effective Mean Confining Stress at Depth D₀={D_0:.2f}m (p')",
@@ -257,6 +276,8 @@ with tab_ex4:
         ],
         "Value": [
             pile_type,
+            soil_profile,
+            f"{exponent}",
             f"Applied (MSF={MSF:.2f})" if apply_msf else "Not Applied (Direct Textbook)",
             f"{E_p_corrected:.1f} GPa",
             f"{p_prime_D0:.2f} kPa",
@@ -268,8 +289,8 @@ with tab_ex4:
             f"{Z_u:.2f} ({classify_behavior(Z_u)})"
         ],
         "Equation Reference": [
-            "-", "-", "Eq. (6.33)", "Eq. (6.34)", "Eq. (6.37)", 
-            "Eq. (6.38)", "Eq. (6.39)", "Eq. (6.40)", "Eq. (6.41)", "Eq. (6.42)"
+            "-", "Fig. 2.4", "Eq. (2.8 - 2.10)", "-", "Eq. (6.33)", "Eq. (6.34)", 
+            "Eq. (6.37)", "Eq. (6.38)", "Eq. (6.39)", "Eq. (6.40)", "Eq. (6.41)", "Eq. (6.42)"
         ]
     })
     st.table(ex4_summary_df)
