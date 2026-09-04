@@ -5,7 +5,7 @@ import pandas as pd
 st.set_page_config(page_title="Pile Foundation Design", layout="wide")
 
 st.title("🏗️ Pile Foundation Design in Liquefiable & Various Soils")
-st.caption("Supports Multiple Soil Profiles, MSF Options & Pile Types")
+st.caption("Supports Layered Soil Profiles (Void Ratios), Dynamic Stiffness & Pile Flexibility")
 
 # ---------------------------------------------------------
 # Step 1: Input Parameters
@@ -18,7 +18,7 @@ with st.expander("📌 **Input Parameters**", expanded=True):
         D_0 = st.number_input("Pile Diameter, $D_0$ (m)", value=0.75, step=0.05)
         L_p = st.number_input("Pile Length, $L_p$ (m)", value=20.0, step=1.0)
         
-        # Soil Profile Selection Added
+        # Soil Profile Selection
         soil_profile = st.selectbox(
             "Select Soil Profile Type", 
             ["Parabolic (Sand / Silty Sand)", "Linear (Soft Clay)", "Constant (Over-consolidated Clay)"]
@@ -43,8 +43,20 @@ with st.expander("📌 **Input Parameters**", expanded=True):
     with col3:
         delta_cv = st.number_input("Interface Friction Angle (°)", value=default_delta, step=1.0)
         rho_soil = st.number_input("Soil Density, $\\rho$ (kg/m³)", value=1700.0, step=50.0)
-        H_layer = st.number_input("Soil Layer Thickness, $H$ (m)", value=8.0, step=0.5)
-        e_silty = st.number_input("Void Ratio, $e$", value=0.90, step=0.05)
+        H_layer = st.number_input("Top Layer Thickness, $H$ (m)", value=8.0, step=0.5)
+
+    st.markdown("---")
+    st.markdown("##### 🧱 Soil Layer Void Ratios ($e$)")
+    
+    # UI Input တွင် Void Ratio 2 ခု သီးခြားယူခြင်း
+    col_e1, col_e2 = st.columns(2)
+    with col_e1:
+        e_top = st.number_input("Void Ratio (Top Layer: Silty Sand)", value=0.90, step=0.05)
+    with col_e2:
+        e_bottom = st.number_input("Void Ratio (Bottom Layer: Dense Sand)", value=0.60, step=0.05)
+
+    # Example 3 နှင့် 4 အတွက် Top Layer Void Ratio (e_silty) ကို Assign လုပ်ပေးခြင်း
+    e_silty = e_top
 
     st.markdown("---")
     st.markdown("##### 🌊 Earthquake Magnitude & Scaling Options")
@@ -167,6 +179,7 @@ with tab_ex2:
 # =========================================================
 with tab_ex3:
     st.subheader("6.3.1 Example 3: Soil Stiffness and Natural Frequency")
+    st.caption(f"ℹ️ Calculations based on Top Soil Layer Void Ratio ($e_{{top}} = {e_silty:.2f}$)")
 
     if apply_msf:
         st.info(f"💡 **MSF Applied ($M_w={M_w:.1f}$):** MSF = {MSF:.2f} | Equiv. $\\tau_{{max}}$ = {tau_max:.2f} kPa")
@@ -198,7 +211,7 @@ with tab_ex3:
 with tab_ex4:
     st.subheader(f"6.3.2 Example 4: Effective Length and Flexibility ({pile_type})")
 
-    # Soil Profile Power Factor Selection (Gazetas 1984 / Eq. 2.8 - 2.10)
+    # Soil Profile Power Factor Selection
     if "Parabolic" in soil_profile:
         exponent = 0.22
         st.caption("🌐 **Profile Selection:** Parabolic Variation ($L_{ad} = 2D_0 (E_p / E_{sD})^{0.22}$)")
@@ -227,7 +240,7 @@ with tab_ex4:
     G_s_D0 = G_ratio * G_0_D0  
     E_sD = 3 * G_s_D0          
 
-    # Effective Active Length with dynamic exponent
+    # Effective Active Length
     L_ad = 2 * D_0 * ((E_p_corrected * 1e9) / (E_sD * 1e6)) ** exponent
     E_I = (E_pile * 1e9) * I_p
 
@@ -263,8 +276,9 @@ with tab_ex4:
         "Parameter": [
             "Pile Type Selected",
             "Soil Profile Type",
+            "Void Ratio Used (Top Layer)",
+            "Void Ratio Specified (Bottom Layer)",
             "Exponent Used for L_ad",
-            "MSF Option Status",
             "Effective Young's Modulus of Pile Section (E_p)",
             f"Effective Mean Confining Stress at Depth D₀={D_0:.2f}m (p')",
             f"Soil Young's Modulus at Depth D₀={D_0:.2f}m (E_sD)",
@@ -277,8 +291,9 @@ with tab_ex4:
         "Value": [
             pile_type,
             soil_profile,
+            f"{e_top:.2f}",
+            f"{e_bottom:.2f}",
             f"{exponent}",
-            f"Applied (MSF={MSF:.2f})" if apply_msf else "Not Applied (Direct Textbook)",
             f"{E_p_corrected:.1f} GPa",
             f"{p_prime_D0:.2f} kPa",
             f"{E_sD:.2f} MPa",
@@ -289,8 +304,8 @@ with tab_ex4:
             f"{Z_u:.2f} ({classify_behavior(Z_u)})"
         ],
         "Equation Reference": [
-            "-", "Fig. 2.4", "Eq. (2.8 - 2.10)", "-", "Eq. (6.33)", "Eq. (6.34)", 
-            "Eq. (6.37)", "Eq. (6.38)", "Eq. (6.39)", "Eq. (6.40)", "Eq. (6.41)", "Eq. (6.42)"
+            "-", "Fig. 2.4", "-", "-", "Eq. (2.8 - 2.10)", "Eq. (6.33)", 
+            "Eq. (6.34)", "Eq. (6.37)", "Eq. (6.38)", "Eq. (6.39)", "Eq. (6.40)", "Eq. (6.41)", "Eq. (6.42)"
         ]
     })
     st.table(ex4_summary_df)
