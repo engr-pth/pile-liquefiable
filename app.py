@@ -5,7 +5,7 @@ import pandas as pd
 st.set_page_config(page_title="Pile Foundation Design", layout="wide")
 
 st.title("🏗️ Pile Foundation Design in Liquefiable & Various Soils")
-st.caption("Supports Layered Soil Profiles (Void Ratios), Dynamic Stiffness & Pile Flexibility")
+st.caption("Supports Dynamic Broms (1966) Static Capacity, Layered Void Ratios & Dynamic Stiffness")
 
 # ---------------------------------------------------------
 # Step 1: Input Parameters
@@ -38,7 +38,7 @@ with st.expander("📌 **Input Parameters**", expanded=True):
             fc_prime = st.number_input("Concrete Strength, $f'_c$ (MPa)", value=30.0, step=5.0)
             E_pile = (4700 * np.sqrt(fc_prime)) / 1000.0  # ACI 318
             st.info(f"Calculated Concrete $E_c$: **{E_pile:.2f} GPa**")
-            default_delta = 30.0
+            default_delta = 26.25  # 0.75 * phi (35 deg)
 
     with col3:
         delta_cv = st.number_input("Interface Friction Angle (°)", value=default_delta, step=1.0)
@@ -48,14 +48,12 @@ with st.expander("📌 **Input Parameters**", expanded=True):
     st.markdown("---")
     st.markdown("##### 🧱 Soil Layer Void Ratios ($e$)")
     
-    # UI Input တွင် Void Ratio 2 ခု သီးခြားယူခြင်း
     col_e1, col_e2 = st.columns(2)
     with col_e1:
         e_top = st.number_input("Void Ratio (Top Layer: Silty Sand)", value=0.90, step=0.05)
     with col_e2:
         e_bottom = st.number_input("Void Ratio (Bottom Layer: Dense Sand)", value=0.60, step=0.05)
 
-    # Example 3 နှင့် 4 အတွက် Top Layer Void Ratio (e_silty) ကို Assign လုပ်ပေးခြင်း
     e_silty = e_top
 
     st.markdown("---")
@@ -126,16 +124,39 @@ tab_ex1, tab_ex2, tab_ex3, tab_ex4 = st.tabs([
 ])
 
 # =========================================================
-# EXAMPLE 1
+# EXAMPLE 1: Static Loading (Broms 1966 & Berezantsev 1961)
 # =========================================================
 with tab_ex1:
     st.subheader("6.2.1 Preliminary Design under Static Loading")
+    
+    # 1. Base Capacity (Eq. 1.2 & Fig. 1.2 Berezantsev)
     A_b = (np.pi / 4) * (D_0 ** 2)
-    sigma_b_eff = (17 * 8) + (19 * 12) - (20 * 10)
-    N_q = 40
+    sigma_b_eff = (17 * 8) + (19 * 12) - (20 * 10)  # Effective stress at tip (156 kPa)
+    N_q = 40  # From Fig 1.2 for phi ~ 35 deg
     Q_b_ex1 = A_b * sigma_b_eff * (N_q - 1)
     
-    Q_s_ex1 = np.pi * D_0 * ((0.5 * 1.27 * (8**2)) + (0.5 * 3.28 * (20**2 - 8**2)))
+    # 2. Shaft Friction Coefficient & Angle (Table 1.1 Broms 1966)
+    if pile_type == "Steel Pipe Pile":
+        K_s1 = 0.5  # Low relative density (Top 8m)
+        K_s2 = 1.0  # High relative density (Bottom 12m)
+        delta_deg = 20.0
+        st.caption("ℹ️ **Broms (1966) Values Applied:** Steel Pile $\\delta_{cv} = 20^\\circ$, $K_{s1}=0.5$, $K_{s2}=1.0$")
+    else:  # Concrete Pile
+        K_s1 = 1.0  # Low relative density
+        K_s2 = 2.0  # High relative density
+        delta_deg = 0.75 * 35.0  # 0.75 * phi'
+        st.caption("ℹ️ **Broms (1966) Values Applied:** Concrete Pile $\\delta_{cv} = 0.75\\phi' = 26.25^\\circ$, $K_{s1}=1.0$, $K_{s2}=2.0$")
+
+    tan_delta = np.tan(np.radians(delta_deg))
+    
+    # Shaft Friction Integration (Eq. 1.3 & 1.4)
+    # Tau = Ks * sig_v' * tan(delta)
+    Q_s_layer1 = K_s1 * tan_delta * (0.5 * 1.27 * (8**2))
+    Q_s_layer2 = K_s2 * tan_delta * (0.5 * 3.28 * (20**2 - 8**2))
+    
+    Q_s_ex1 = np.pi * D_0 * (Q_s_layer1 + Q_s_layer2)
+    
+    # Total Capacity (Eq. 1.1)
     Q_u_ex1 = Q_b_ex1 + Q_s_ex1
     N_required_ex1 = (P_axial * 1000) / Q_u_ex1
 
