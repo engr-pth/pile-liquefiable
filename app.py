@@ -256,38 +256,57 @@ with tab_ex2:
     st.dataframe(summary_df, use_container_width=True)
 
 # =========================================================
-# STEP 2: BROMS STATIC METHOD
+# STEP 2: BROMS STATIC METHOD (DYNAMIC FORMULA)
 # =========================================================
 with tab_ex1:
     st.subheader("6.2.1 Preliminary Design under Static Loading (Broms 1966)")
     
-    H_top = 8.0
+    H_top = 8.0  # Layer 1 depth (m)
     A_b = (np.pi / 4) * (D_0 ** 2)
+    
+    # Effective stress at pile tip
     sigma_b_eff = sigma_v0[-1]
     N_q = 40  
     Q_b_ex1 = A_b * sigma_b_eff * (N_q - 1)
 
+    # Pile Material Parameters (Broms 1966, Table 1.1)
     if "Steel" in pile_type:
         K_s1, K_s2 = 0.5, 1.0
+        delta_cv = 20.0
         st.info("ℹ️ **Broms (1966) Steel Parameters:** $\\delta_{cv} = 20^\\circ$, $K_{s1}=0.5$, $K_{s2}=1.0$")
     else:
         K_s1, K_s2 = 1.0, 2.0
+        # For concrete, delta_cv = 0.75 * phi' (assuming phi' = 35° -> delta_cv = 26.25°)
+        delta_cv = 26.25
         st.info("ℹ️ **Broms (1966) Concrete Parameters:** $\\delta_{cv} = 26.25^\\circ$, $K_{s1}=1.0$, $K_{s2}=2.0$")
 
+    # Effective Unit Weights (kN/m³)
+    gamma_sub1 = 17.0 - 10.0  # Layer 1 (0 to 8m)
+    gamma_sub2 = 19.0 - 10.0  # Layer 2 (8 to 20m)
+
     tan_delta = np.tan(np.radians(delta_cv))
-    Q_s_layer1 = K_s1 * tan_delta * (0.5 * 1.27 * (H_top**2))
-    Q_s_layer2 = K_s2 * tan_delta * (0.5 * 3.28 * (L_p**2 - H_top**2))
-    
+
+    # Integrations of Effective Vertical Stress (∫ σ'v dz)
+    int_sigma_v1 = 0.5 * gamma_sub1 * (H_top ** 2)
+    int_sigma_v2 = 0.5 * gamma_sub2 * (L_p ** 2 - H_top ** 2)
+
+    # Unit Shaft Resistance Integrals (K_s * tan(delta) * ∫ σ'v dz)
+    Q_s_layer1 = K_s1 * tan_delta * int_sigma_v1
+    Q_s_layer2 = K_s2 * tan_delta * int_sigma_v2
+
+    # Total Shaft Capacity Q_s = Perimeter (π * D) * Total Unit Shaft Resistance
     Q_s_ex1 = np.pi * D_0 * (Q_s_layer1 + Q_s_layer2)
+    
+    # Total Ultimate Bearing Capacity Q_u
     Q_u_ex1 = Q_b_ex1 + Q_s_ex1
     N_required_ex1 = (P_axial * 1000) / Q_u_ex1
 
+    # Display Results
     res_col1, res_col2, res_col3, res_col4 = st.columns(4)
     res_col1.metric("Base Capacity ($Q_b$)", f"{Q_b_ex1:.0f} kN")
     res_col2.metric("Shaft Capacity ($Q_s$)", f"{Q_s_ex1:.0f} kN")
     res_col3.metric("Total Capacity ($Q_u$)", f"{Q_u_ex1:.0f} kN")
     res_col4.metric("Req. Piles (FOS=1)", f"{N_required_ex1:.2f}")
-
 # =========================================================
 # STEP 3: DYNAMIC SOIL STIFFNESS
 # =========================================================
