@@ -2,73 +2,14 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 
-st.set_page_config(page_title="Pile Foundation Design", layout="wide")
+st.set_page_config(page_title="Pile Foundation Design WorkFlow", layout="wide")
 
-st.title("🏗️ Pile Foundation Design in Liquefiable & Various Soils")
-st.caption("Supports Dynamic Broms (1966) Static Capacity, Layered Void Ratios & Dynamic Stiffness")
+st.title("🏗️ Geotechnical & Foundation Design Workflow")
+st.caption("CPT-Based Analysis ➔ Static Empirical Capacity ➔ Dynamic Soil Stiffness ➔ SSI & Active Length")
 
 # ---------------------------------------------------------
-# Step 1: Input Parameters
+# Raw Field CPT Data (Example Site Investigation Data)
 # ---------------------------------------------------------
-with st.expander("📌 **Input Parameters**", expanded=True):
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        pile_type = st.selectbox("Select Pile Type", ["Steel Pipe Pile", "Bored Concrete Pile"])
-        D_0 = st.number_input("Pile Diameter, $D_0$ (m)", value=0.75, step=0.05)
-        L_p = st.number_input("Pile Length, $L_p$ (m)", value=20.0, step=1.0)
-        
-        # Soil Profile Selection
-        soil_profile = st.selectbox(
-            "Select Soil Profile Type", 
-            ["Parabolic (Sand / Silty Sand)", "Linear (Soft Clay)", "Constant (Over-consolidated Clay)"]
-        )
-
-    with col2:
-        P_axial = st.number_input("Axial Load (MN)", value=9.4, step=0.1)
-        d_cone = st.number_input("Cone Diameter (mm)", value=25.4, step=0.1)
-        a_g = st.number_input("Peak Ground Acceleration, $a_g$ (g)", value=0.2, step=0.05)
-        
-        if pile_type == "Steel Pipe Pile":
-            t_wall = st.number_input("Pile Wall Thickness, $t$ (m)", value=0.012, step=0.001)
-            E_pile = st.number_input("Steel Modulus, $E_p$ (GPa)", value=210.0, step=5.0)
-            default_delta = 20.0
-        else:
-            t_wall = D_0 / 2.0  # Solid Circular Section
-            fc_prime = st.number_input("Concrete Strength, $f'_c$ (MPa)", value=30.0, step=5.0)
-            E_pile = (4700 * np.sqrt(fc_prime)) / 1000.0  # ACI 318
-            st.info(f"Calculated Concrete $E_c$: **{E_pile:.2f} GPa**")
-            default_delta = 26.25  # 0.75 * phi (35 deg)
-
-    with col3:
-        delta_cv = st.number_input("Interface Friction Angle (°)", value=default_delta, step=1.0)
-        rho_soil = st.number_input("Soil Density, $\\rho$ (kg/m³)", value=1700.0, step=50.0)
-        H_layer = st.number_input("Top Layer Thickness, $H$ (m)", value=8.0, step=0.5)
-
-    st.markdown("---")
-    st.markdown("##### 🧱 Soil Layer Void Ratios ($e$)")
-    
-    col_e1, col_e2 = st.columns(2)
-    with col_e1:
-        e_top = st.number_input("Void Ratio (Top Layer: Silty Sand)", value=0.90, step=0.05)
-    with col_e2:
-        e_bottom = st.number_input("Void Ratio (Bottom Layer: Dense Sand)", value=0.60, step=0.05)
-
-    e_silty = e_top
-
-    st.markdown("---")
-    st.markdown("##### 🌊 Earthquake Magnitude & Scaling Options")
-    col_msf1, col_msf2 = st.columns(2)
-    with col_msf1:
-        M_w = st.number_input("Earthquake Magnitude, $M_w$", value=6.0, step=0.1)
-    with col_msf2:
-        st.write("")
-        st.write("")
-        apply_msf = st.checkbox("Apply Magnitude Scaling Factor (MSF) to $\\tau_{max}$?", value=False)
-
-st.divider()
-
-# CPT Raw Data
 depths = np.arange(0, 21, 1)
 sigma_v0 = [0, 7, 14, 21, 28, 35, 42, 49, 56, 81, 90, 99, 108, 117, 126, 135, 144, 153, 162, 171, 180]
 qc_values = [0, 0.74, 1.19, 1.81, 1.82, 2.41, 2.79, 3.25, 3.43, 12.85, 13.77, 16.03, 17.94, 19.07, 17.88, 24.94, 20.93, 23.71, 22.97, 26.59, 28.89]
@@ -91,7 +32,61 @@ def solve_shear_strain(tau_target, G0_kpa, gamma_r=2e-4, c=0.79):
     return mid
 
 # ---------------------------------------------------------
-# Dynamic Shear Stress Calculation
+# Sidebar Inputs & CPT-based e Correlation Logic
+# ---------------------------------------------------------
+st.sidebar.header("⚙️ Design Parameters")
+
+pile_type = st.sidebar.selectbox("Select Pile Type", ["Steel Pipe Pile", "Bored Concrete Pile"])
+D_0 = st.sidebar.number_input("Pile Diameter, $D_0$ (m)", value=0.75, step=0.05)
+L_p = st.sidebar.number_input("Pile Length, $L_p$ (m)", value=20.0, step=1.0)
+P_axial = st.sidebar.number_input("Axial Load (MN)", value=9.4, step=0.1)
+
+soil_profile = st.sidebar.selectbox(
+    "Select Soil Profile Type", 
+    ["Parabolic (Sand / Silty Sand)", "Linear (Soft Clay)", "Constant (Over-consolidated Clay)"]
+)
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("🔗 CPT Data Correlation Settings")
+
+# Top 8m average qc (MPa) calculation
+qc_top_avg = np.mean(qc_values[1:9])  
+
+if qc_top_avg < 5.0:
+    e_correlated_top = 0.90  # Medium / Loose silty sand
+elif 5.0 <= qc_top_avg < 15.0:
+    e_correlated_top = 0.75  # Medium dense
+else:
+    e_correlated_top = 0.60  # Dense sand
+
+use_cpt_correlation = st.sidebar.checkbox("Auto-correlate Void Ratio ($e$) from CPT?", value=True)
+
+if use_cpt_correlation:
+    e_top = e_correlated_top
+    st.sidebar.success(f"Correlate $e_{{top}} = {e_top:.2f}$ (from Avg $q_c = {qc_top_avg:.2f}$ MPa)")
+else:
+    e_top = st.sidebar.number_input("Manual Void Ratio (Top Layer)", value=0.90, step=0.05)
+
+e_bottom = st.sidebar.number_input("Void Ratio (Bottom Dense Layer)", value=0.60, step=0.05)
+e_silty = e_top
+
+st.sidebar.markdown("---")
+a_g = st.sidebar.number_input("PGA, $a_g$ (g)", value=0.2, step=0.05)
+M_w = st.sidebar.number_input("Earthquake Magnitude, $M_w$", value=6.0, step=0.1)
+apply_msf = st.sidebar.checkbox("Apply MSF to $\\tau_{max}$?", value=False)
+
+if pile_type == "Steel Pipe Pile":
+    t_wall = st.sidebar.number_input("Pile Wall Thickness (m)", value=0.012, step=0.001)
+    E_pile = 210.0
+    delta_cv = 20.0
+else:
+    t_wall = D_0 / 2.0
+    fc_prime = 30.0
+    E_pile = (4700 * np.sqrt(fc_prime)) / 1000.0
+    delta_cv = 26.25
+
+# ---------------------------------------------------------
+# Dynamic Shear Stress Calculation Logic
 # ---------------------------------------------------------
 K_0 = 0.46
 sigma_v0_4m = 28.0
@@ -114,63 +109,23 @@ gamma_sol = solve_shear_strain(tau_max, G_0 * 1000, gamma_r, c_exponent)
 G_ratio = 1 / ((1 + (gamma_sol / gamma_r)) ** c_exponent)
 
 # ---------------------------------------------------------
-# Tabs
+# Tab Order Arranged by Practical Geotechnical Workflow
 # ---------------------------------------------------------
-tab_ex1, tab_ex2, tab_ex3, tab_ex4 = st.tabs([
-    "📌 Example 1: Static Loading", 
-    "📊 Example 2: CPT Methods", 
-    "🌊 Example 3: Dynamic Soil Stiffness",
-    "📏 Example 4: Effective Length & Flexibility"
+tab_ex2, tab_ex1, tab_ex3, tab_ex4 = st.tabs([
+    "📊 Step 1: CPT-Based Capacity (Ex 2)", 
+    "📌 Step 2: Broms Static Capacity (Ex 1)", 
+    "🌊 Step 3: Dynamic Soil Stiffness (Ex 3)",
+    "📏 Step 4: Active Length & SSI (Ex 4)"
 ])
 
 # =========================================================
-# EXAMPLE 1: Static Loading (Broms 1966 & Berezantsev 1961)
-# =========================================================
-with tab_ex1:
-    st.subheader("6.2.1 Preliminary Design under Static Loading")
-    
-    # 1. Base Capacity (Eq. 1.2 & Fig. 1.2 Berezantsev)
-    A_b = (np.pi / 4) * (D_0 ** 2)
-    sigma_b_eff = (17 * 8) + (19 * 12) - (20 * 10)  # Effective stress at tip (156 kPa)
-    N_q = 40  # From Fig 1.2 for phi ~ 35 deg
-    Q_b_ex1 = A_b * sigma_b_eff * (N_q - 1)
-    
-    # 2. Shaft Friction Coefficient & Angle (Table 1.1 Broms 1966)
-    if pile_type == "Steel Pipe Pile":
-        K_s1 = 0.5  # Low relative density (Top 8m)
-        K_s2 = 1.0  # High relative density (Bottom 12m)
-        delta_deg = 20.0
-        st.caption("ℹ️ **Broms (1966) Values Applied:** Steel Pile $\\delta_{cv} = 20^\\circ$, $K_{s1}=0.5$, $K_{s2}=1.0$")
-    else:  # Concrete Pile
-        K_s1 = 1.0  # Low relative density
-        K_s2 = 2.0  # High relative density
-        delta_deg = 0.75 * 35.0  # 0.75 * phi'
-        st.caption("ℹ️ **Broms (1966) Values Applied:** Concrete Pile $\\delta_{cv} = 0.75\\phi' = 26.25^\\circ$, $K_{s1}=1.0$, $K_{s2}=2.0$")
-
-    tan_delta = np.tan(np.radians(delta_deg))
-    
-    # Shaft Friction Integration (Eq. 1.3 & 1.4)
-    # Tau = Ks * sig_v' * tan(delta)
-    Q_s_layer1 = K_s1 * tan_delta * (0.5 * 1.27 * (8**2))
-    Q_s_layer2 = K_s2 * tan_delta * (0.5 * 3.28 * (20**2 - 8**2))
-    
-    Q_s_ex1 = np.pi * D_0 * (Q_s_layer1 + Q_s_layer2)
-    
-    # Total Capacity (Eq. 1.1)
-    Q_u_ex1 = Q_b_ex1 + Q_s_ex1
-    N_required_ex1 = (P_axial * 1000) / Q_u_ex1
-
-    res_col1, res_col2, res_col3, res_col4 = st.columns(4)
-    res_col1.metric("Base Capacity ($Q_b$)", f"{Q_b_ex1:.0f} kN")
-    res_col2.metric("Shaft Capacity ($Q_s$)", f"{Q_s_ex1:.0f} kN")
-    res_col3.metric("Total Capacity ($Q_u$)", f"{Q_u_ex1:.0f} kN")
-    res_col4.metric("Req. Piles (FOS=1)", f"{N_required_ex1:.2f}")
-
-# =========================================================
-# EXAMPLE 2
+# STEP 1: CPT METHOD (Former Example 2)
 # =========================================================
 with tab_ex2:
-    st.subheader("6.2.2 Design based on CPT Data")
+    st.subheader("6.2.2 CPT-Based Axial Pile Capacity")
+    st.caption("Field Investigation Step: Direct calculation using continuous cone resistance ($q_c$) profile.")
+
+    d_cone = 25.4
     qc_tip_book = 26.7
     qb_qc_ratio = max(1 - 0.5 * np.log10((D_0 * 1000) / d_cone), 0.13)
     q_b_cpt = qb_qc_ratio * qc_tip_book
@@ -196,23 +151,55 @@ with tab_ex2:
     col_d.metric("Req. Piles ($N$)", f"{N_piles_mtd:.1f}")
 
 # =========================================================
-# EXAMPLE 3
+# STEP 2: BROMS STATIC METHOD (Former Example 1)
+# =========================================================
+with tab_ex1:
+    st.subheader("6.2.1 Preliminary Design under Static Loading (Broms 1966)")
+    st.caption("Analytical Verification Step: Capacity calculation based on soil strength properties.")
+
+    A_b = (np.pi / 4) * (D_0 ** 2)
+    sigma_b_eff = (17 * 8) + (19 * 12) - (20 * 10)
+    N_q = 40  
+    Q_b_ex1 = A_b * sigma_b_eff * (N_q - 1)
+
+    if pile_type == "Steel Pipe Pile":
+        K_s1, K_s2, delta_deg = 0.5, 1.0, 20.0
+        st.info("ℹ️ **Broms (1966) Steel Parameters:** $\\delta_{cv} = 20^\\circ$, $K_{s1}=0.5$, $K_{s2}=1.0$")
+    else:
+        K_s1, K_s2, delta_deg = 1.0, 2.0, 0.75 * 35.0
+        st.info("ℹ️ **Broms (1966) Concrete Parameters:** $\\delta_{cv} = 26.25^\\circ$, $K_{s1}=1.0$, $K_{s2}=2.0$")
+
+    tan_delta = np.tan(np.radians(delta_deg))
+    Q_s_layer1 = K_s1 * tan_delta * (0.5 * 1.27 * (8**2))
+    Q_s_layer2 = K_s2 * tan_delta * (0.5 * 3.28 * (20**2 - 8**2))
+    
+    Q_s_ex1 = np.pi * D_0 * (Q_s_layer1 + Q_s_layer2)
+    Q_u_ex1 = Q_b_ex1 + Q_s_ex1
+    N_required_ex1 = (P_axial * 1000) / Q_u_ex1
+
+    res_col1, res_col2, res_col3, res_col4 = st.columns(4)
+    res_col1.metric("Base Capacity ($Q_b$)", f"{Q_b_ex1:.0f} kN")
+    res_col2.metric("Shaft Capacity ($Q_s$)", f"{Q_s_ex1:.0f} kN")
+    res_col3.metric("Total Capacity ($Q_u$)", f"{Q_u_ex1:.0f} kN")
+    res_col4.metric("Req. Piles (FOS=1)", f"{N_required_ex1:.2f}")
+
+# =========================================================
+# STEP 3: DYNAMIC SOIL STIFFNESS (Former Example 3)
 # =========================================================
 with tab_ex3:
-    st.subheader("6.3.1 Example 3: Soil Stiffness and Natural Frequency")
-    st.caption(f"ℹ️ Calculations based on Top Soil Layer Void Ratio ($e_{{top}} = {e_silty:.2f}$)")
-
-    if apply_msf:
-        st.info(f"💡 **MSF Applied ($M_w={M_w:.1f}$):** MSF = {MSF:.2f} | Equiv. $\\tau_{{max}}$ = {tau_max:.2f} kPa")
+    st.subheader("6.3.1 Soil Stiffness and Natural Frequency")
+    
+    if use_cpt_correlation:
+        st.success(f"💡 **CPT Correlated Void Ratio Used:** $e_{{top}} = {e_silty:.2f}$ (Derived from Avg $q_c = {qc_top_avg:.2f}$ MPa)")
     else:
-        st.info(f"💡 **Direct Textbook Approach:** Raw $\\tau_{{max}}$ = {tau_max:.2f} kPa")
+        st.warning(f"💡 **Manual Input Void Ratio Used:** $e_{{top}} = {e_silty:.2f}$")
 
     gamma_percent = gamma_sol * 100
     G_s = G_ratio * G_0
     nu = 0.5
     E_s = 2 * G_s * (1 + nu)
-    v_s = np.sqrt((G_s * 1e6) / rho_soil)
-    f_n = v_s / (4 * H_layer)
+    v_s = np.sqrt((G_s * 1e6) / 1700.0)
+    f_n = v_s / (4 * 8.0)
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Confining Stress ($p'$)", f"{p_prime:.2f} kPa")
@@ -227,49 +214,38 @@ with tab_ex3:
     m8.metric("Natural Freq. ($f_n$)", f"{f_n:.2f} Hz")
 
 # =========================================================
-# EXAMPLE 4
+# STEP 4: ACTIVE LENGTH & FLEXIBILITY (Former Example 4)
 # =========================================================
 with tab_ex4:
-    st.subheader(f"6.3.2 Example 4: Effective Length and Flexibility ({pile_type})")
+    st.subheader(f"6.3.2 Effective Active Length and Pile Flexibility ({pile_type})")
 
-    # Soil Profile Power Factor Selection
     if "Parabolic" in soil_profile:
         exponent = 0.22
-        st.caption("🌐 **Profile Selection:** Parabolic Variation ($L_{ad} = 2D_0 (E_p / E_{sD})^{0.22}$)")
     elif "Linear" in soil_profile:
         exponent = 0.20
-        st.caption("🌐 **Profile Selection:** Linear Variation ($L_{ad} = 2D_0 (E_p / E_{sD})^{0.20}$)")
     else:
         exponent = 0.25
-        st.caption("🌐 **Profile Selection:** Constant Variation ($L_{ad} = 2D_0 (E_p / E_{sD})^{0.25}$)")
 
     if pile_type == "Steel Pipe Pile":
         D_i = D_0 - (2 * t_wall)
         E_p_corrected = E_pile / ((D_0**4) / (D_0**4 - D_i**4))
         I_p = (np.pi / 64) * (D_0**4 - D_i**4)
     else:
-        D_i = 0.0
         E_p_corrected = E_pile
         I_p = (np.pi / 64) * (D_0**4)
 
     sigma_v0_D0 = 7.0 * D_0  
     p_prime_D0 = ((1 + 2 * K_0) / 3) * sigma_v0_D0
-    
-    p_prime_D0_MPa = p_prime_D0 / 1000.0
-    G_0_D0 = 100 * (((3 - e_silty) ** 2) / (1 + e_silty)) * np.sqrt(p_prime_D0_MPa)
-    
+    G_0_D0 = 100 * (((3 - e_silty) ** 2) / (1 + e_silty)) * np.sqrt(p_prime_D0 / 1000.0)
     G_s_D0 = G_ratio * G_0_D0  
     E_sD = 3 * G_s_D0          
 
-    # Effective Active Length
     L_ad = 2 * D_0 * ((E_p_corrected * 1e9) / (E_sD * 1e6)) ** exponent
     E_I = (E_pile * 1e9) * I_p
 
     k_lower, k_upper = 200.0, 2000.0
-
     T_u = ((E_I) / (k_lower * 1e3)) ** 0.2
     Z_L = L_p / T_u
-
     T_l = ((E_I) / (k_upper * 1e3)) ** 0.2
     Z_u = L_p / T_l
 
@@ -280,7 +256,7 @@ with tab_ex4:
 
     col_e1, col_e2, col_e3, col_e4 = st.columns(4)
     col_e1.metric("Design Pile Modulus ($E_p$)", f"{E_p_corrected:.1f} GPa")
-    col_e2.metric(f"Soil Modulus at {D_0:.2f}m ($E_{{sD}}$)", f"{E_sD:.2f} MPa")
+    col_e2.metric(f"Soil Modulus ($E_{{sD}}$)", f"{E_sD:.2f} MPa")
     col_e3.metric("Effective Active Length ($L_{ad}$)", f"{L_ad:.2f} m")
     col_e4.metric("Flexural Rigidity ($E_p I_p$)", f"{E_I/1e6:.1f} MN·m²")
 
@@ -289,44 +265,3 @@ with tab_ex4:
     col_e6.metric("Relative Length ($Z_L$)", f"{Z_L:.2f} ({classify_behavior(Z_L)})")
     col_e7.metric("Elastic Length ($T_l$, k=2000)", f"{T_l:.3f} m")
     col_e8.metric("Relative Length ($Z_u$)", f"{Z_u:.2f} ({classify_behavior(Z_u)})")
-
-    st.markdown("---")
-    st.markdown("#### 📐 Example 4 Calculation Summary")
-
-    ex4_summary_df = pd.DataFrame({
-        "Parameter": [
-            "Pile Type Selected",
-            "Soil Profile Type",
-            "Void Ratio Used (Top Layer)",
-            "Void Ratio Specified (Bottom Layer)",
-            "Exponent Used for L_ad",
-            "Effective Young's Modulus of Pile Section (E_p)",
-            f"Effective Mean Confining Stress at Depth D₀={D_0:.2f}m (p')",
-            f"Soil Young's Modulus at Depth D₀={D_0:.2f}m (E_sD)",
-            "Effective Active Pile Length (L_ad)",
-            "Elastic Length for k = 200 kN/m³ (T_u)",
-            "Dimensionless Length Z_L (L / T_u)",
-            "Elastic Length for k = 2000 kN/m³ (T_l)",
-            "Dimensionless Length Z_u (L / T_l)"
-        ],
-        "Value": [
-            pile_type,
-            soil_profile,
-            f"{e_top:.2f}",
-            f"{e_bottom:.2f}",
-            f"{exponent}",
-            f"{E_p_corrected:.1f} GPa",
-            f"{p_prime_D0:.2f} kPa",
-            f"{E_sD:.2f} MPa",
-            f"{L_ad:.2f} m",
-            f"{T_u:.3f} m",
-            f"{Z_L:.2f} ({classify_behavior(Z_L)})",
-            f"{T_l:.3f} m",
-            f"{Z_u:.2f} ({classify_behavior(Z_u)})"
-        ],
-        "Equation Reference": [
-            "-", "Fig. 2.4", "-", "-", "Eq. (2.8 - 2.10)", "Eq. (6.33)", 
-            "Eq. (6.34)", "Eq. (6.37)", "Eq. (6.38)", "Eq. (6.39)", "Eq. (6.40)", "Eq. (6.41)", "Eq. (6.42)"
-        ]
-    })
-    st.table(ex4_summary_df)
