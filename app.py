@@ -441,7 +441,7 @@ with tab_ex4:
     col_e7.metric("Elastic Length ($T_l$, k=2000)", f"{T_l:.3f} m")
     col_e8.metric("Relative Length ($Z_u$)", f"{Z_u:.2f} ({classify_behavior(Z_u)})")
 
-    with st.expander("📖 **Step-by-Step Calculation Details (Active Length & Flexibility)**", expanded=False):
+with st.expander("📖 **Step-by-Step Calculation Details (Active Length & Flexibility)**", expanded=False):
         st.write(r"#### 1. Pile Cross-sectional Properties")
         st.write(f"* Inner Diameter: $D_i = D_0 - 2t = {D_0:.3f} - 2({t_wall:.3f}) = {D_i:.3f} \\text{{ m}}$")
         st.latex(rf"I_p = \frac{{\pi}}{{64}} (D_0^4 - D_i^4) = {I_p:.6f} \text{{ m}}^4")
@@ -451,7 +451,13 @@ with tab_ex4:
         st.latex(r"L_{ad} = 2 D_0 \left( \frac{E_p}{E_{sD}} \right)^n")
         st.write(f"* Soil Modulus at Active Depth ($10 D_0 = {10*D_0:.2f}\\text{{m}}$): $E_{{sD}} = {E_sD:.2f} \\text{{ MPa}}$")
         st.write(f"* Assigned Exponent: $n = {exponent}$")
-        st.latex(rf"L_{{ad}} = 2({D_0:.2f}) \left( \frac{{{E_p_corrected \times 10^9}}}{{{E_sD \times 10^6}}} \right)^{{{exponent}}} = {L_ad:.2f} \text{{ m}}")
+        
+        # ---------------------------------------------------------
+        # Line 454 (Fixed Syntax Error):
+        # ---------------------------------------------------------
+        val_ep = E_p_corrected * 1e9
+        val_esd = E_sD * 1e6
+        st.latex(rf"L_{{ad}} = 2({D_0:.2f}) \left( \frac{{{val_ep:.1e}}}{{{val_esd:.1e}}} \right)^{{{exponent}}} = {L_ad:.2f} \text{{ m}}")
 
         st.write(r"#### 3. Pile Flexibility Criteria ($T$ and $Z = L/T$)")
         st.latex(r"T = \left( \frac{E_p I_p}{k_h} \right)^{0.2}")
