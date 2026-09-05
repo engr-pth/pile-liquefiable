@@ -102,7 +102,25 @@ with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/
             sigma_v0.append(sigma_v0[-1] + gamma_eff * dz)
 
         e_silty = e_values[4] if len(e_values) > 4 else 0.90
-        soil_profile = st.selectbox("Soil Profile Type", ["Parabolic (Sand / Silty Sand)", "Linear (Soft Clay)", "Constant (OC Clay)"])
+
+        # ---------------------------------------------------------
+        # AUTO-DETECTION LOGIC FOR SOIL PROFILE TYPE
+        # ---------------------------------------------------------
+        top_layer_type = classified_descriptions[4] if len(classified_descriptions) > 4 else classified_descriptions[0]
+
+        if "Sand" in top_layer_type:
+            auto_profile = "Parabolic (Sand / Silty Sand)"
+            exponent = 0.22
+        elif "NC" in top_layer_type or "Soft" in top_layer_type:
+            auto_profile = "Linear (Soft Clay)"
+            exponent = 0.20
+        else:
+            auto_profile = "Constant (OC Clay)"
+            exponent = 0.25
+
+        st.text_input("Auto-Detected Soil Profile Type", value=auto_profile, disabled=True)
+        st.info(f"💡 Active Length Exponent Auto-Assigned: **n = {exponent}**")
+
         a_g = st.number_input("PGA, $a_g$ (g)", value=0.2, step=0.05)
         M_w = st.number_input("Earthquake Magnitude, $M_w$", value=6.0, step=0.1)
         apply_msf = st.checkbox("Apply MSF to $\\tau_{max}$?", value=False)
@@ -258,13 +276,6 @@ with tab_ex3:
 with tab_ex4:
     st.subheader(f"6.3.2 Effective Active Length and Pile Flexibility ({pile_type})")
 
-    if "Parabolic" in soil_profile:
-        exponent = 0.22
-    elif "Linear" in soil_profile:
-        exponent = 0.20
-    else:
-        exponent = 0.25
-
     if pile_type == "Steel Pipe Pile":
         D_i = D_0 - (2 * t_wall)
         E_p_corrected = E_pile / ((D_0**4) / (D_0**4 - D_i**4))
@@ -279,6 +290,7 @@ with tab_ex4:
     G_s_D0 = G_ratio * G_0_D0  
     E_sD = 3 * G_s_D0          
 
+    # Active length calculated using the dynamic exponent value
     L_ad = 2 * D_0 * ((E_p_corrected * 1e9) / (E_sD * 1e6)) ** exponent
     E_I = (E_pile * 1e9) * I_p
 
