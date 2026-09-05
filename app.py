@@ -396,19 +396,18 @@ with tab_ex3:
         st.latex(rf"f_n = \frac{{v_s}}{{4 H_1}} = \frac{{{v_s:.2f}}}{{4 \times {H_top}}} = {f_n:.2f} \text{{ Hz}}")
 
 # =========================================================
-# STEP 4: ACTIVE LENGTH & SSI (UPDATED WITH OPTION SELECTOR)
+# STEP 4: CPT-BASED AUTO K-SELECTION & DYNAMIC OPTION
 # =========================================================
 with tab_ex4:
     st.subheader(f"6.3.2 Effective Active Length and Pile Flexibility ({pile_type})")
 
-    # Dynamic Section Settings for Subgrade Modulus Gradient (k)
     st.markdown("---")
     st.markdown("##### ⚙️ Subgrade Modulus Gradient ($k$) Selection Mode")
     
     k_mode = st.radio(
         "Choose Analysis Approach for Subgrade Modulus Gradient (k):",
         [
-            "Option 1: Single Nominal Value (Base on SPT N / CPT qc)",
+            "Option 1: Single Nominal Value (Auto CPT qc / Manual)",
             "Option 2: Bounding Approach (Upper & Lower Bound Range)"
         ],
         horizontal=True
@@ -436,12 +435,35 @@ with tab_ex4:
         elif 2.5 <= z_val <= 5.0: return "Semi-Flexible"
         else: return "Rigid"
 
-    # Display Output according to selected Option
     if "Option 1" in k_mode:
-        k_nominal = st.number_input(
-            "Enter Nominal Gradient of Soil Modulus, $k$ (kN/m³)", 
-            value=2200.0, step=100.0, help="Typical values: Loose (200-2000), Medium (2000-6000), Dense (>6000)"
+        k_calc_method = st.radio(
+            "Determine $k$ via:",
+            ["Auto-calculate from Top Soil CPT qc", "Manual Input"],
+            horizontal=True
         )
+
+        if "Auto-calculate" in k_calc_method:
+            # Active Zone Depth (approx. 5*D0)
+            z_active = 5.0 * D_0
+            sigma_v_eff = gamma_silty * z_active # Effective Overburden (kPa)
+            
+            qc_input = st.number_input("Average CPT $q_c$ at Active Zone ($0-5D$) in MPa", value=8.5, step=0.5)
+            
+            # Relative Density estimation (Jamiolkowski et al., 1988)
+            dr_est = min(100.0, max(10.0, 100 * np.sqrt((qc_input * 1000) / (300 * np.sqrt(sigma_v_eff)))))
+            
+            # API RP 2GEO Submerged Sand Correlation for k
+            if dr_est < 40:
+                k_nominal = 1300 + (dr_est / 40.0) * (2200 - 1300)
+            elif dr_est <= 80:
+                k_nominal = 2200 + ((dr_est - 40) / 40.0) * (5400 - 2200)
+            else:
+                k_nominal = 5400 + ((dr_est - 80) / 20.0) * (11000 - 5400)
+                
+            st.info(f"💡 Calculated Estimated $D_r$: **{dr_est:.1f}%** $\\rightarrow$ Derived $k$: **{k_nominal:.0f} kN/m³** (API RP 2GEO)")
+        else:
+            k_nominal = st.number_input("Enter Gradient of Soil Modulus, $k$ (kN/m³)", value=2200.0, step=100.0)
+
         T_nom = ((E_I) / (k_nominal * 1e3)) ** 0.2
         Z_nom = L_p / T_nom
 
@@ -478,34 +500,3 @@ with tab_ex4:
         col_e6.metric("Relative Length ($Z_L$)", f"{Z_L:.2f} ({classify_behavior(Z_L)})")
         col_e7.metric("Elastic Length ($T_l$, Upper)", f"{T_l:.3f} m")
         col_e8.metric("Relative Length ($Z_u$)", f"{Z_u:.2f} ({classify_behavior(Z_u)})")
-
-    # Step-by-Step Expander
-    with st.expander("📖 **Step-by-Step Calculation Details (Active Length & Flexibility)**", expanded=False):
-        st.write(r"#### 1. Pile Cross-sectional Properties")
-        st.write(f"* Inner Diameter: $D_i = D_0 - 2t = {D_0:.3f} - 2({t_wall:.3f}) = {D_i:.3f} \\text{{ m}}$")
-        st.latex(rf"I_p = \frac{{\pi}}{{64}} (D_0^4 - D_i^4) = {I_p:.6f} \text{{ m}}^4")
-        st.latex(rf"E_p I_p = {E_pile} \times 10^9 \times {I_p:.6f} = {E_I/1e6:.2f} \text{{ MN}}\cdot\text{{m}}^2")
-
-        st.write(r"#### 2. Effective Active Length ($L_{ad}$)")
-        st.latex(r"L_{ad} = 2 D_0 \left( \frac{E_p}{E_{sD}} \right)^n")
-        st.write(f"* Soil Modulus at Active Depth ($10 D_0 = {10*D_0:.2f}\\text{{m}}$): $E_{{sD}} = {E_sD:.2f} \\text{{ MPa}}$")
-        st.write(f"* Assigned Exponent: $n = {exponent}$")
-        
-        val_ep = E_p_corrected * 1e9
-        val_esd = E_sD * 1e6
-        st.latex(rf"L_{{ad}} = 2({D_0:.2f}) \left( \frac{{{val_ep:.1e}}}{{{val_esd:.1e}}} \right)^{{{exponent}}} = {L_ad:.2f} \text{{ m}}")
-
-        st.write(r"#### 3. Pile Flexibility Criteria ($T$ and $Z = L/T$)")
-        st.latex(r"T = \left( \frac{E_p I_p}{k_h} \right)^{0.2}")
-        
-        if "Option 1" in k_mode:
-            st.write(f"**Nominal Value ($k = {k_nominal:.0f} \\text{{ kN/m}}^3$):**")
-            st.latex(rf"T = \left( \frac{{{E_I:.0f}}}{{{k_nominal*1000:.0f}}} \right)^{{0.2}} = {T_nom:.3f} \text{{ m}}")
-            st.write(f"* Relative Length: $Z = \\frac{{{L_p}}}{{{T_nom:.3f}}} = {Z_nom:.2f} \\rightarrow$ **{classify_behavior(Z_nom)}**")
-        else:
-            st.write(f"**Lower Bound ($k_{{lower}} = {k_lower:.0f} \\text{{ kN/m}}^3$):**")
-            st.latex(rf"T_u = \left( \frac{{{E_I:.0f}}}{{{k_lower*1000:.0f}}} \right)^{{0.2}} = {T_u:.3f} \text{{ m}}")
-            st.write(f"* Relative Length: $Z_L = \\frac{{{L_p}}}{{{T_u:.3f}}} = {Z_L:.2f} \\rightarrow$ **{classify_behavior(Z_L)}**")
-            st.write(f"**Upper Bound ($k_{{upper}} = {k_upper:.0f} \\text{{ kN/m}}^3$):**")
-            st.latex(rf"T_l = \left( \frac{{{E_I:.0f}}}{{{k_upper*1000:.0f}}} \right)^{{0.2}} = {T_l:.3f} \text{{ m}}")
-            st.write(f"* Relative Length: $Z_u = \\frac{{{L_p}}}{{{T_l:.3f}}} = {Z_u:.2f} \\rightarrow$ **{classify_behavior(Z_u)}**")
