@@ -438,21 +438,25 @@ with tab_ex4:
     if "Option 1" in k_mode:
         k_calc_method = st.radio(
             "Determine $k$ via:",
-            ["Auto-calculate from Top Soil CPT qc", "Manual Input"],
+            ["Auto-calculate from CPT Profile (0 to 5D0)", "Manual Input"],
             horizontal=True
         )
 
         if "Auto-calculate" in k_calc_method:
-            z_active = 5.0 * D_0
+            # Active zone defined as 0 to 5*D0 depth
+            z_active_limit = 5.0 * D_0
             
-            # gamma_silty မရှိပါက gamma_sub = 10 kN/m3 ကို Fallback အဖြစ် သုံးပါမည်
-            gamma_eff = gamma_silty if 'gamma_silty' in locals() or 'gamma_silty' in globals() else 10.0
-            sigma_v_eff = gamma_eff * z_active # Effective Overburden (kPa)
+            # Filter Table Data for 0 to 5D_0 depth
+            active_mask_5d = depths <= z_active_limit
+            qc_active_subset = qc_values[active_mask_5d]
+            sigma_v_active_subset = np.array(sigma_v0)[active_mask_5d]
             
-            qc_input = st.number_input("Average CPT $q_c$ at Active Zone ($0-5D$) in MPa", value=8.5, step=0.5)
+            # Average qc in active zone (MPa)
+            qc_avg_active = np.mean(qc_active_subset) if len(qc_active_subset) > 0 else 1.0
+            sigma_v_eff = np.mean(sigma_v_active_subset) if len(sigma_v_active_subset) > 0 else 10.0
             
             # Relative Density estimation (Jamiolkowski et al., 1988)
-            dr_est = min(100.0, max(10.0, 100 * np.sqrt((qc_input * 1000) / (300 * np.sqrt(max(sigma_v_eff, 1.0))))))
+            dr_est = min(100.0, max(10.0, 100 * np.sqrt((qc_avg_active * 1000) / (300 * np.sqrt(max(sigma_v_eff, 1.0))))))
             
             # API RP 2GEO Submerged Sand Correlation for k
             if dr_est < 40:
@@ -462,7 +466,11 @@ with tab_ex4:
             else:
                 k_nominal = 5400 + ((dr_est - 80) / 20.0) * (11000 - 5400)
                 
-            st.info(f"💡 Calculated Estimated $D_r$: **{dr_est:.1f}%** $\\rightarrow$ Derived $k$: **{k_nominal:.0f} kN/m³** (API RP 2GEO)")
+            st.info(
+                f"📊 **Auto-fetched Active Depth ($0 - {z_active_limit:.2f}\\text{{ m}}$):** "
+                f"Avg $q_c = \\mathbf{{{qc_avg_active:.2f}\\text{{ MPa}}}}$ | "
+                f"Est. $D_r = \\mathbf{{{dr_est:.1f}\\%}}$ $\\rightarrow$ Derived $k = \\mathbf{{{k_nominal:.0f}\\text{{ kN/m³}}}}$ (API RP 2GEO)"
+            )
         else:
             k_nominal = st.number_input("Enter Gradient of Soil Modulus, $k$ (kN/m³)", value=2200.0, step=100.0)
 
