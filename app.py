@@ -24,19 +24,20 @@ def solve_shear_strain(tau_target, G0_kpa, gamma_r=2e-4, c=0.79):
             high = mid
     return mid
 
-def correlate_void_ratio(qc_avg):
-    if qc_avg < 5.0:
-        return 0.90  # Loose / Medium Silty Sand
-    elif 5.0 <= qc_avg < 15.0:
-        return 0.75  # Medium Dense Sand
+# Dynamic Void Ratio Function based on qc value
+def get_void_ratio(qc):
+    if qc < 5.0:
+        return 0.90  # Loose / Soft
+    elif 5.0 <= qc < 15.0:
+        return 0.75  # Medium Dense
     else:
-        return 0.60  # Dense Sand
+        return 0.60  # Dense Sand / Hard Clay
 
 # ---------------------------------------------------------
 # Main Input Section
 # ---------------------------------------------------------
 with st.expander("⚙️ **Design Parameters & CPT Profile Input (Click to Expand/Collapse)**", expanded=True):
-    col_p1, col_p2, col_p3 = st.columns([1, 1.2, 1])
+    col_p1, col_p2, col_p3 = st.columns([1, 1.3, 1])
     
     with col_p1:
         st.subheader("1. Pile Properties")
@@ -47,7 +48,7 @@ with st.expander("⚙️ **Design Parameters & CPT Profile Input (Click to Expan
 
     with col_p2:
         st.subheader("2. CPT Field Profile Data")
-        st.caption("CPT $q_c$ (MPa) တန်ဖိုးများကို အောက်ပါ Table တွင် တိုက်ရိုက် ပြင်ဆင်နိုင်ပါသည်။")
+        st.caption("CPT $q_c$ (MPa) တန်ဖိုးများကို စိတ်ကြိုက် ပြင်ဆင်နိုင်ပါသည်။")
         
         default_cpt_df = pd.DataFrame({
             "Depth (m)": np.arange(0, 21, 1),
@@ -68,27 +69,26 @@ with st.expander("⚙️ **Design Parameters & CPT Profile Input (Click to Expan
 
     with col_p3:
         st.subheader("3. Dynamic & Correlation Settings")
-        use_cpt_correlation = st.checkbox("Auto-correlate Void Ratios ($e$) from CPT?", value=True)
+        use_cpt_correlation = st.checkbox("Auto-correlate Void Ratio ($e$) from $q_c$?", value=True)
         
-        # Calculate Average qc for Top (0-8m) and Bottom (8-20m) Layers
-        qc_top_avg = np.mean(qc_values[1:9])
-        qc_bottom_avg = np.mean(qc_values[9:21])
-        
+        # Calculate e for each depth point based on qc rule
         if use_cpt_correlation:
-            e_top = correlate_void_ratio(qc_top_avg)
-            e_bottom = correlate_void_ratio(qc_bottom_avg)
-            st.info(f"💡 **Top Layer (0-8m):** Avg $q_c = {qc_top_avg:.2f}$ MPa ➔ $e_{{top}} = {e_top:.2f}$")
-            st.info(f"💡 **Bottom Layer (8-20m):** Avg $q_c = {qc_bottom_avg:.2f}$ MPa ➔ $e_{{bottom}} = {e_bottom:.2f}$")
+            e_values = [get_void_ratio(q) for q in qc_values]
+            e_silty = e_values[4]  # Mid-depth of top soft layer (~4m)
+            st.info(f"💡 **Auto-Correlated Rule:**\n- $q_c < 5$ MPa $\\implies e = 0.90$\n- $5 \\le q_c < 15$ MPa $\\implies e = 0.75$\n- $q_c \\ge 15$ MPa $\\implies e = 0.60$")
         else:
-            e_top = st.number_input("Manual Void Ratio (Top Layer)", value=0.90, step=0.05)
-            e_bottom = st.number_input("Manual Void Ratio (Bottom Layer)", value=0.60, step=0.05)
+            manual_e = st.number_input("Manual Void Ratio ($e$)", value=0.90, step=0.05)
+            e_values = [manual_e] * len(depths)
+            e_silty = manual_e
+
+        # Auto-detect top layer thickness (where qc < 5 MPa)
+        top_layer_depths = [z for z, q in zip(depths, qc_values) if q < 5.0 and z > 0]
+        H_top = max(top_layer_depths) if top_layer_depths else 8.0
 
         soil_profile = st.selectbox("Soil Profile Type", ["Parabolic (Sand / Silty Sand)", "Linear (Soft Clay)", "Constant (OC Clay)"])
         a_g = st.number_input("PGA, $a_g$ (g)", value=0.2, step=0.05)
         M_w = st.number_input("Earthquake Magnitude, $M_w$", value=6.0, step=0.1)
         apply_msf = st.checkbox("Apply MSF to $\\tau_{max}$?", value=False)
-
-e_silty = e_top
 
 if pile_type == "Steel Pipe Pile":
     t_wall = 0.012
@@ -108,7 +108,7 @@ sigma_v0_4m = 28.0
 p_prime = ((1 + 2 * K_0) / 3) * sigma_v0_4m
 G_0 = 100 * (((3 - e_silty) ** 2) / (1 + e_silty)) * np.sqrt(p_prime / 1000.0)
 
-z_mid = 4.0
+z_mid = H_top / 2.0
 r_d = 1 - 0.01 * z_mid
 tau_max_raw = 0.65 * a_g * 68.0 * r_d
 
@@ -124,7 +124,7 @@ gamma_sol = solve_shear_strain(tau_max, G_0 * 1000, gamma_r, c_exponent)
 G_ratio = 1 / ((1 + (gamma_sol / gamma_r)) ** c_exponent)
 
 # ---------------------------------------------------------
-# Tab Order Arranged by Practical Geotechnical Workflow
+# Tabs Section
 # ---------------------------------------------------------
 tab_ex2, tab_ex1, tab_ex3, tab_ex4 = st.tabs([
     "📊 Step 1: CPT-Based Capacity (Ex 2)", 
@@ -134,14 +134,14 @@ tab_ex2, tab_ex1, tab_ex3, tab_ex4 = st.tabs([
 ])
 
 # =========================================================
-# STEP 1: CPT METHOD (Former Example 2)
+# STEP 1: CPT METHOD
 # =========================================================
 with tab_ex2:
     st.subheader("6.2.2 CPT-Based Axial Pile Capacity")
     st.caption("Field Investigation Step: Direct calculation using continuous cone resistance ($q_c$) profile.")
 
     d_cone = 25.4
-    qc_tip_book = 26.7
+    qc_tip_book = qc_values[-1]  # Bottom-most qc value
     qb_qc_ratio = max(1 - 0.5 * np.log10((D_0 * 1000) / d_cone), 0.13)
     q_b_cpt = qb_qc_ratio * qc_tip_book
     Q_b_ex2 = q_b_cpt * ((np.pi / 4) * (D_0 ** 2)) * 1000
@@ -166,14 +166,14 @@ with tab_ex2:
     col_d.metric("Req. Piles ($N$)", f"{N_piles_mtd:.1f}")
 
 # =========================================================
-# STEP 2: BROMS STATIC METHOD (Former Example 1)
+# STEP 2: BROMS STATIC METHOD
 # =========================================================
 with tab_ex1:
     st.subheader("6.2.1 Preliminary Design under Static Loading (Broms 1966)")
     st.caption("Analytical Verification Step: Capacity calculation based on soil strength properties.")
 
     A_b = (np.pi / 4) * (D_0 ** 2)
-    sigma_b_eff = (17 * 8) + (19 * 12) - (20 * 10)
+    sigma_b_eff = (17 * H_top) + (19 * (L_p - H_top)) - (10 * L_p)
     N_q = 40  
     Q_b_ex1 = A_b * sigma_b_eff * (N_q - 1)
 
@@ -185,8 +185,8 @@ with tab_ex1:
         st.info("ℹ️ **Broms (1966) Concrete Parameters:** $\\delta_{cv} = 26.25^\\circ$, $K_{s1}=1.0$, $K_{s2}=2.0$")
 
     tan_delta = np.tan(np.radians(delta_deg))
-    Q_s_layer1 = K_s1 * tan_delta * (0.5 * 1.27 * (8**2))
-    Q_s_layer2 = K_s2 * tan_delta * (0.5 * 3.28 * (20**2 - 8**2))
+    Q_s_layer1 = K_s1 * tan_delta * (0.5 * 1.27 * (H_top**2))
+    Q_s_layer2 = K_s2 * tan_delta * (0.5 * 3.28 * (L_p**2 - H_top**2))
     
     Q_s_ex1 = np.pi * D_0 * (Q_s_layer1 + Q_s_layer2)
     Q_u_ex1 = Q_b_ex1 + Q_s_ex1
@@ -199,22 +199,17 @@ with tab_ex1:
     res_col4.metric("Req. Piles (FOS=1)", f"{N_required_ex1:.2f}")
 
 # =========================================================
-# STEP 3: DYNAMIC SOIL STIFFNESS (Former Example 3)
+# STEP 3: DYNAMIC SOIL STIFFNESS
 # =========================================================
 with tab_ex3:
     st.subheader("6.3.1 Soil Stiffness and Natural Frequency")
     
-    if use_cpt_correlation:
-        st.success(f"💡 **CPT Correlated Void Ratio Used:** $e_{{top}} = {e_silty:.2f}$ (Derived from Avg $q_c = {qc_top_avg:.2f}$ MPa)")
-    else:
-        st.warning(f"💡 **Manual Input Void Ratio Used:** $e_{{top}} = {e_silty:.2f}$")
-
     gamma_percent = gamma_sol * 100
     G_s = G_ratio * G_0
     nu = 0.5
     E_s = 2 * G_s * (1 + nu)
     v_s = np.sqrt((G_s * 1e6) / 1700.0)
-    f_n = v_s / (4 * 8.0)
+    f_n = v_s / (4 * H_top)
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Confining Stress ($p'$)", f"{p_prime:.2f} kPa")
@@ -229,7 +224,7 @@ with tab_ex3:
     m8.metric("Natural Freq. ($f_n$)", f"{f_n:.2f} Hz")
 
 # =========================================================
-# STEP 4: ACTIVE LENGTH & FLEXIBILITY (Former Example 4)
+# STEP 4: ACTIVE LENGTH & FLEXIBILITY
 # =========================================================
 with tab_ex4:
     st.subheader(f"6.3.2 Effective Active Length and Pile Flexibility ({pile_type})")
