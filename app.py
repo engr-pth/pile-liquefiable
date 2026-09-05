@@ -43,7 +43,7 @@ def classify_soil_behavior(soil_type, qc):
 # Main Input Section
 # ---------------------------------------------------------
 with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/Collapse)**", expanded=True):
-    col_p1, col_p2, col_p3 = st.columns([1, 1.4, 1])
+    col_p1, col_p2, col_p3 = st.columns([1, 1.4, 1.2])
     
     with col_p1:
         st.subheader("1. Pile Properties")
@@ -104,22 +104,52 @@ with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/
         e_silty = e_values[4] if len(e_values) > 4 else 0.90
 
         # ---------------------------------------------------------
-        # AUTO-DETECTION LOGIC FOR SOIL PROFILE TYPE
+        # AUTO-DETLECTION & CLASSIFICATION METHOD SELECTION
         # ---------------------------------------------------------
-        top_layer_type = classified_descriptions[4] if len(classified_descriptions) > 4 else classified_descriptions[0]
+        method_choice = st.radio(
+            "Select Soil Profile Classification Method:",
+            [
+                "Method 1: Dominant Soil Type in Active Depth (10D₀)",
+                "Method 2: Weighted Average Exponent (n_eq) in Active Depth (10D₀)"
+            ]
+        )
 
-        if "Sand" in top_layer_type:
-            auto_profile = "Parabolic (Sand / Silty Sand)"
-            exponent = 0.22
-        elif "NC" in top_layer_type or "Soft" in top_layer_type:
-            auto_profile = "Linear (Soft Clay)"
-            exponent = 0.20
+        active_depth_limit = 10 * D_0  # Active Zone Depth Limit (e.g., 10 * 0.75 = 7.5m)
+        active_mask = depths <= active_depth_limit
+        active_descriptions = np.array(classified_descriptions)[active_mask]
+
+        if "Method 1" in method_choice:
+            # Method 1 Logic: Dominant Soil Type
+            sand_count = sum(1 for d in active_descriptions if "Sand" in d)
+            soft_clay_count = sum(1 for d in active_descriptions if "NC" in d or "Soft" in d)
+            stiff_clay_count = sum(1 for d in active_descriptions if "OC" in d or "Stiff" in d)
+
+            if sand_count >= max(soft_clay_count, stiff_clay_count):
+                auto_profile = "Parabolic (Sand / Silty Sand)"
+                exponent = 0.22
+            elif soft_clay_count >= stiff_clay_count:
+                auto_profile = "Linear (Soft Clay)"
+                exponent = 0.20
+            else:
+                auto_profile = "Constant (OC Clay)"
+                exponent = 0.25
         else:
-            auto_profile = "Constant (OC Clay)"
-            exponent = 0.25
+            # Method 2 Logic: Weighted Average Exponent
+            exponents = []
+            for desc in classified_descriptions:
+                if "Sand" in desc:
+                    exponents.append(0.22)
+                elif "NC" in desc or "Soft" in desc:
+                    exponents.append(0.20)
+                else:
+                    exponents.append(0.25)
+
+            active_exponents = np.array(exponents)[active_mask]
+            exponent = round(float(np.mean(active_exponents)), 3)
+            auto_profile = f"Interbedded Layer (Weighted Average n = {exponent})"
 
         st.text_input("Auto-Detected Soil Profile Type", value=auto_profile, disabled=True)
-        st.info(f"💡 Active Length Exponent Auto-Assigned: **n = {exponent}**")
+        st.info(f"💡 Active Depth Limit ($10D_0$): **{active_depth_limit:.2f} m** | Assigned Exponent: **n = {exponent}**")
 
         a_g = st.number_input("PGA, $a_g$ (g)", value=0.2, step=0.05)
         M_w = st.number_input("Earthquake Magnitude, $M_w$", value=6.0, step=0.1)
@@ -290,7 +320,7 @@ with tab_ex4:
     G_s_D0 = G_ratio * G_0_D0  
     E_sD = 3 * G_s_D0          
 
-    # Active length calculated using the dynamic exponent value
+    # Active length calculated using the dynamic exponent value based on chosen method
     L_ad = 2 * D_0 * ((E_p_corrected * 1e9) / (E_sD * 1e6)) ** exponent
     E_I = (E_pile * 1e9) * I_p
 
