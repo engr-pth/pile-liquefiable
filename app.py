@@ -24,38 +24,26 @@ def solve_shear_strain(tau_target, G0_kpa, gamma_r=2e-4, c=0.79):
             high = mid
     return mid
 
-# Soil Type Multi-Parameter Correlation Rule
-SOIL_DATABASE = {
-    "NC Soft Clay": {"gamma": 16.0, "e_default": 1.10, "phi": 22.0},
-    "OC Clay": {"gamma": 18.0, "e_default": 0.70, "phi": 28.0},
-    "Loose / Silty Sand": {"gamma": 17.0, "e_default": 0.90, "phi": 30.0},
-    "Medium Dense Sand": {"gamma": 18.5, "e_default": 0.75, "phi": 34.0},
-    "Dense Sand / Granular": {"gamma": 20.0, "e_default": 0.60, "phi": 38.0},
-    "Clean Sand": {"gamma": 19.0, "e_default": 0.65, "phi": 36.0}
-}
-
-def classify_soil_and_get_e(qc, selected_type):
-    # Rule-Based Auto-Classification based on qc threshold & user selection
-    if selected_type == "Auto Classify from qc":
+# Dual Classification Engine: Soil Type (Clay/Sand) + qc Threshold
+def classify_soil_behavior(soil_type, qc):
+    if soil_type == "Clay":
         if qc < 1.5:
             return "NC Soft Clay", 1.10, 16.0
-        elif 1.5 <= qc < 5.0:
+        else:
+            return "OC Stiff Clay", 0.70, 18.0
+    else:  # Sand
+        if qc < 5.0:
             return "Loose / Silty Sand", 0.90, 17.0
         elif 5.0 <= qc < 15.0:
             return "Medium Dense Sand", 0.75, 18.5
-        elif 15.0 <= qc < 25.0:
-            return "Clean Sand", 0.65, 19.0
         else:
             return "Dense Sand / Granular", 0.60, 20.0
-    else:
-        info = SOIL_DATABASE[selected_type]
-        return selected_type, info["e_default"], info["gamma"]
 
 # ---------------------------------------------------------
 # Main Input Section
 # ---------------------------------------------------------
-with st.expander("⚙️ **Design Parameters & Soil Test Data (Click to Expand/Collapse)**", expanded=True):
-    col_p1, col_p2, col_p3 = st.columns([1, 1.3, 1])
+with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/Collapse)**", expanded=True):
+    col_p1, col_p2, col_p3 = st.columns([1, 1.4, 1])
     
     with col_p1:
         st.subheader("1. Pile Properties")
@@ -66,51 +54,54 @@ with st.expander("⚙️ **Design Parameters & Soil Test Data (Click to Expand/C
 
     with col_p2:
         st.subheader("2. CPT Field Soil Test Input")
-        st.caption("Depth (m) နှင့် CPT $q_c$ (MPa) တန်ဖိုးများသာ ထည့်သွင်းရန် လိုအပ်ပါသည်။")
+        st.caption("`Soil Type` (Clay/Sand) နှင့် CPT $q_c$ (MPa) တန်ဖိုးများကို Depth အလိုက် ရွေးချယ်ရိုက်ထည့်ပါ။")
         
+        # Default CPT Profile Data Frame
         default_cpt_df = pd.DataFrame({
             "Depth (m)": np.arange(0, 21, 1),
+            "Soil Type": ["Clay", "Clay", "Clay"] + ["Sand"] * 18,
             "qc (MPa)": [0, 0.74, 1.19, 1.81, 1.82, 2.41, 2.79, 3.25, 3.43, 12.85, 13.77, 16.03, 17.94, 19.07, 17.88, 24.94, 20.93, 23.71, 22.97, 26.59, 28.89]
         })
         
         edited_cpt_df = st.data_editor(
             default_cpt_df,
-            height=200,
+            column_config={
+                "Soil Type": st.column_config.SelectboxColumn(
+                    "Soil Type",
+                    options=["Clay", "Sand"],
+                    required=True
+                )
+            },
+            height=250,
             num_rows="fixed",
             use_container_width=True
         )
         
         depths = edited_cpt_df["Depth (m)"].values
+        user_soil_types = edited_cpt_df["Soil Type"].values
         qc_values = edited_cpt_df["qc (MPa)"].values
 
     with col_p3:
-        st.subheader("3. Soil Type Mapping & Settings")
-        soil_override = st.selectbox(
-            "Soil Type Determination", 
-            ["Auto Classify from qc", "NC Soft Clay", "OC Clay", "Loose / Silty Sand", "Medium Dense Sand", "Clean Sand", "Dense Sand / Granular"]
-        )
-
-        # Dynamic array calculation for Soil Classification, Void Ratio, and Overburden Stress
-        classified_types = []
+        st.subheader("3. Dynamic Correlation Settings")
+        
+        classified_descriptions = []
         e_values = []
         gamma_values = []
         
-        for q in qc_values:
-            s_type, e_val, g_val = classify_soil_and_get_e(q, soil_override)
-            classified_types.append(s_type)
+        for stype, q in zip(user_soil_types, qc_values):
+            desc, e_val, g_val = classify_soil_behavior(stype, q)
+            classified_descriptions.append(desc)
             e_values.append(e_val)
             gamma_values.append(g_val)
 
-        # Automatic Effective Stress Sigma_v0 calculation (Cumulative integration)
+        # Dynamic Sigma_v0 calculation based on Effective Unit Weight
         sigma_v0 = [0.0]
         for i in range(1, len(depths)):
             dz = depths[i] - depths[i-1]
-            gamma_eff = max(gamma_values[i] - 9.81, 7.0)  # Submerged effective unit weight
+            gamma_eff = max(gamma_values[i] - 9.81, 7.0)
             sigma_v0.append(sigma_v0[-1] + gamma_eff * dz)
 
         e_silty = e_values[4] if len(e_values) > 4 else 0.90
-        st.info(f"💡 **Top Layer Auto-Classified as:** `{classified_types[4] if len(classified_types) > 4 else classified_types[0]}` ($e \\approx {e_silty:.2f}$)")
-
         soil_profile = st.selectbox("Soil Profile Type", ["Parabolic (Sand / Silty Sand)", "Linear (Soft Clay)", "Constant (OC Clay)"])
         a_g = st.number_input("PGA, $a_g$ (g)", value=0.2, step=0.05)
         M_w = st.number_input("Earthquake Magnitude, $M_w$", value=6.0, step=0.1)
@@ -163,9 +154,8 @@ tab_ex2, tab_ex1, tab_ex3, tab_ex4 = st.tabs([
 # STEP 1: CPT METHOD
 # =========================================================
 with tab_ex2:
-    st.subheader("6.2.2 CPT-Based Axial Pile Capacity")
-    st.caption("Field Investigation Step: Direct calculation using continuous cone resistance ($q_c$) profile.")
-
+    st.subheader("6.2.2 CPT-Based Axial Pile Capacity & Soil Profile Table")
+    
     d_cone = 25.4
     qc_tip_book = qc_values[-1]
     qb_qc_ratio = max(1 - 0.5 * np.log10((D_0 * 1000) / d_cone), 0.13)
@@ -191,12 +181,15 @@ with tab_ex2:
     col_c.metric("Total Capacity ($Q_u$)", f"{Q_u_mtd:.0f} kN")
     col_d.metric("Req. Piles ($N$)", f"{N_piles_mtd:.1f}")
 
-    st.subheader("📋 Soil Classification Log per Depth")
+    st.markdown("---")
+    st.subheader("📋 Dynamic Soil Classification Table (Calculated from CPT Data)")
+    
     summary_df = pd.DataFrame({
         "Depth (m)": depths,
+        "Selected Soil Behavior": user_soil_types,
         "qc (MPa)": qc_values,
         "Auto-Calculated σ'v0 (kPa)": np.round(sigma_v0, 2),
-        "Classified Soil Type": classified_types,
+        "Classified Soil Type & Density": classified_descriptions,
         "Mapped Void Ratio (e)": e_values
     })
     st.dataframe(summary_df, use_container_width=True)
@@ -206,8 +199,7 @@ with tab_ex2:
 # =========================================================
 with tab_ex1:
     st.subheader("6.2.1 Preliminary Design under Static Loading (Broms 1966)")
-    st.caption("Analytical Verification Step: Capacity calculation based on soil strength properties.")
-
+    
     H_top = 8.0
     A_b = (np.pi / 4) * (D_0 ** 2)
     sigma_b_eff = sigma_v0[-1]
