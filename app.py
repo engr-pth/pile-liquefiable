@@ -443,14 +443,16 @@ with tab_ex4:
         )
 
         if "Auto-calculate" in k_calc_method:
-            # Active Zone Depth (approx. 5*D0)
             z_active = 5.0 * D_0
-            sigma_v_eff = gamma_silty * z_active # Effective Overburden (kPa)
+            
+            # gamma_silty မရှိပါက gamma_sub = 10 kN/m3 ကို Fallback အဖြစ် သုံးပါမည်
+            gamma_eff = gamma_silty if 'gamma_silty' in locals() or 'gamma_silty' in globals() else 10.0
+            sigma_v_eff = gamma_eff * z_active # Effective Overburden (kPa)
             
             qc_input = st.number_input("Average CPT $q_c$ at Active Zone ($0-5D$) in MPa", value=8.5, step=0.5)
             
             # Relative Density estimation (Jamiolkowski et al., 1988)
-            dr_est = min(100.0, max(10.0, 100 * np.sqrt((qc_input * 1000) / (300 * np.sqrt(sigma_v_eff)))))
+            dr_est = min(100.0, max(10.0, 100 * np.sqrt((qc_input * 1000) / (300 * np.sqrt(max(sigma_v_eff, 1.0))))))
             
             # API RP 2GEO Submerged Sand Correlation for k
             if dr_est < 40:
