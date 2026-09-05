@@ -75,24 +75,47 @@ with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/
 
     with col_p2:
         st.subheader("2. CPT Field Soil Test Input")
-        st.caption("`Soil Type` (Clay/Sand) နှင့် CPT $q_c$ (MPa) တန်ဖိုးများကို Depth အလိုက် ရွေးချယ်ရိုက်ထည့်ပါ။")
+        st.caption("`Soil Type` နှင့် CPT $q_c$ (MPa) တန်ဖိုးများကို Depth အလိုက် ရိုက်ထည့်ပါ။")
         
-        # Default CPT Profile Data Frame
+        # 1. Soil Density Mode ရွေးချယ်မှု ထည့်သွင်းခြင်း
+        density_mode = st.radio(
+            "Soil Unit Weight (γ) Selection Mode:",
+            ["Auto (Correlate from CPT qc)", "Manual Input"],
+            horizontal=True
+        )
+
+        # Default CPT Profile Data Frame (Manual γ Column ပါဝင်အောင် ပြင်ဆင်ထားသည်)
         default_cpt_df = pd.DataFrame({
             "Depth (m)": np.arange(0, 21, 1),
             "Soil Type": ["Clay", "Clay", "Clay"] + ["Sand"] * 18,
-            "qc (MPa)": [0, 0.74, 1.19, 1.81, 1.82, 2.41, 2.79, 3.25, 3.43, 12.85, 13.77, 16.03, 17.94, 19.07, 17.88, 24.94, 20.93, 23.71, 22.97, 26.59, 28.89]
+            "qc (MPa)": [0, 0.74, 1.19, 1.81, 1.82, 2.41, 2.79, 3.25, 3.43, 12.85, 13.77, 16.03, 17.94, 19.07, 17.88, 24.94, 20.93, 23.71, 22.97, 26.59, 28.89],
+            "γ_manual (kN/m³)": [16.0, 16.0, 16.0] + [17.0] * 6 + [18.5] * 2 + [20.0] * 10
         })
         
+        # Mode ပေါ်မူတည်၍ Manual Column ပြမပြ ထိန်းချုပ်ခြင်း
+        column_config = {
+            "Soil Type": st.column_config.SelectboxColumn(
+                "Soil Type",
+                options=["Clay", "Sand"],
+                required=True
+            )
+        }
+        
+        if density_mode == "Manual Input":
+            column_config["γ_manual (kN/m³)"] = st.column_config.NumberColumn(
+                "γ Total (kN/m³)",
+                min_value=10.0,
+                max_value=25.0,
+                step=0.5,
+                required=True
+            )
+        else:
+            # Auto Mode တွင် γ_manual column ကို Table ထဲတွင် ဖျောက်ထားမည်
+            default_cpt_df = default_cpt_df.drop(columns=["γ_manual (kN/m³)"])
+
         edited_cpt_df = st.data_editor(
             default_cpt_df,
-            column_config={
-                "Soil Type": st.column_config.SelectboxColumn(
-                    "Soil Type",
-                    options=["Clay", "Sand"],
-                    required=True
-                )
-            },
+            column_config=column_config,
             height=250,
             num_rows="fixed",
             use_container_width=True
@@ -101,6 +124,8 @@ with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/
         depths = edited_cpt_df["Depth (m)"].values
         user_soil_types = edited_cpt_df["Soil Type"].values
         qc_values = edited_cpt_df["qc (MPa)"].values
+        if density_mode == "Manual Input":
+            user_gamma_manual = edited_cpt_df["γ_manual (kN/m³)"].values
 
     with col_p3:
         st.subheader("3. Dynamic Correlation Settings")
@@ -109,11 +134,16 @@ with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/
         e_values = []
         gamma_values = []
         
-        for stype, q in zip(user_soil_types, qc_values):
+        for i, (stype, q) in enumerate(zip(user_soil_types, qc_values)):
             desc, e_val, g_val = classify_soil_behavior(stype, q)
             classified_descriptions.append(desc)
             e_values.append(e_val)
-            gamma_values.append(g_val)
+            
+            # Mode ပေါ်မူတည်၍ Density တန်ဖိုး ယူခြင်း
+            if density_mode == "Manual Input":
+                gamma_values.append(user_gamma_manual[i])
+            else:
+                gamma_values.append(g_val)
 
         # Dynamic Sigma_v0 calculation based on Effective Unit Weight
         sigma_v0 = [0.0]
