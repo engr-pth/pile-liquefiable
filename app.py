@@ -58,13 +58,13 @@ with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/
             t_wall = st.number_input("Wall Thickness, $t$ (m)", value=0.012, step=0.001, format="%.3f")
             E_pile = 210.0  # GPa (Steel)
             delta_cv = 20.0 # Steel-Soil Interface Friction Angle
-            st.caption("ℹ️ **Steel Pipe:** $E_p = 210$ GPa, $\\delta_{cv} = 20^\circ$")
+            st.caption("ℹ️ **Steel Pipe:** $E_p = 210$ GPa, $\\delta_{cv} = 20^\\circ$")
         else:
             t_wall = st.number_input("Wall Thickness, $t$ (m)", value=0.090, step=0.005, format="%.3f")
             fc_prime = st.number_input("Concrete Strength, $f'_c$ (MPa)", value=60.0, step=5.0)
             E_pile = (4700 * np.sqrt(fc_prime)) / 1000.0  # GPa
             delta_cv = 26.25 # Concrete-Soil Interface Friction Angle
-            st.caption(f"ℹ️ **Spun Concrete:** $E_p = {E_pile:.2f}$ GPa, $\\delta_{{cv}} = 26.25^\circ$")
+            st.caption(f"ℹ️ **Spun Concrete:** $E_p = {E_pile:.2f}$ GPa, $\\delta_{{cv}} = 26.25^\\circ$")
 
         L_p = st.number_input("Pile Length, $L_p$ (m)", value=20.0, step=1.0)
         P_axial = st.number_input("Axial Load (MN)", value=9.4, step=0.1)
@@ -259,28 +259,23 @@ with tab_ex2:
     col_d.metric("Req. Piles ($N$)", f"{N_piles_mtd:.1f}")
 
     with st.expander("📖 **Step-by-Step Calculation Details (ICP / CPT Method)**", expanded=False):
-        st.markdown(f"""
-        #### 1. Pile Base Area ($A_b$)
-        $$A_b = \\frac{{\\pi}}{{4}} D_0^2 = \\frac{{\\pi}}{{4}} ({D_0:.2f})^2 = {A_b_cpt:.4f} \\text{{ m}}^2$$
+        st.write(r"#### 1. Pile Base Area ($A_b$)")
+        st.latex(rf"A_b = \frac{{\pi}}{{4}} D_0^2 = \frac{{\pi}}{{4}} ({D_0:.2f})^2 = {A_b_cpt:.4f} \text{{ m}}^2")
 
-        #### 2. CPT End Bearing Resistance ($q_b$)
-        * Cone equivalent diameter: $d_c = {d_cone} \\text{{ mm}}$
-        * Base Capacity Ratio:
-          $$\\frac{{q_b}}{{q_c}} = 1 - 0.5 \\log_{{10}}\\left(\\frac{{D_0 \\cdot 1000}}{{d_c}}\\right) = 1 - 0.5 \\log_{{10}}\\left(\\frac{{{D_0*1000:.0f}}}{{{d_cone}}}\\right) = {qb_qc_ratio:.3f}$$
-        * Unit End Bearing: $q_b = {qb_qc_ratio:.3f} \\times {qc_tip_book:.2f} = {q_b_cpt:.2f} \\text{{ MPa}}$
-        * Base Capacity ($Q_b$):
-          $$Q_b = q_b \\cdot A_b \\cdot 1000 = {q_b_cpt:.2f} \\times {A_b_cpt:.4f} \\times 1000 = \\mathbf{{{Q_b_ex2:.0f} \\text{{ kN}}}}$$
+        st.write(r"#### 2. CPT End Bearing Resistance ($q_b$)")
+        st.write(f"* Cone equivalent diameter: $d_c = {d_cone} \\text{{ mm}}$")
+        st.latex(rf"\frac{{q_b}}{{q_c}} = 1 - 0.5 \log_{{10}}\left(\frac{{D_0 \cdot 1000}}{{d_c}}\right) = 1 - 0.5 \log_{{10}}\left(\frac{{{D_0*1000:.0f}}}{{{d_cone}}}\right) = {qb_qc_ratio:.3f}")
+        st.latex(rf"q_b = {qb_qc_ratio:.3f} \times {qc_tip_book:.2f} = {q_b_cpt:.2f} \text{{ MPa}}")
+        st.latex(rf"Q_b = q_b \cdot A_b \cdot 1000 = {q_b_cpt:.2f} \times {A_b_cpt:.4f} \times 1000 = {Q_b_ex2:.0f} \text{{ kN}}")
 
-        #### 3. Unit Shaft Friction ($\tau_s$) & Integration
-        $$\\tau_s(z) = \\left(\\frac{{q_c}}{{45}}\\right) \\left(\\frac{{\\sigma'_v}}{{100}}\\right)^{{0.13}} \\left(\\frac{{D_0}}{{z}}\\right)^{{0.38}} \\tan(\\delta_{{cv}})$$
-        * Shaft Friction Integral ($\int \\tau_s dz$): **{int_tau_mtd:.2f} kN/m**
-        * Total Shaft Capacity ($Q_s$):
-          $$Q_s = \\pi D_0 \\int \\tau_s dz = \\pi \\times {D_0:.2f} \\times {int_tau_mtd:.2f} = \\mathbf{{{Q_s_mtd:.0f} \\text{{ kN}}}}$$
+        st.write(r"#### 3. Unit Shaft Friction ($\tau_s$) & Integration")
+        st.latex(r"\tau_s(z) = \left(\frac{q_c}{45}\right) \left(\frac{\sigma'_v}{100}\right)^{0.13} \left(\frac{D_0}{z}\right)^{0.38} \tan(\delta_{cv})")
+        st.write(f"* Shaft Friction Integral ($\\int \\tau_s dz$): **{int_tau_mtd:.2f} kN/m**")
+        st.latex(rf"Q_s = \pi D_0 \int \tau_s dz = \pi \times {D_0:.2f} \times {int_tau_mtd:.2f} = {Q_s_mtd:.0f} \text{{ kN}}")
 
-        #### 4. Total Capacity & Number of Piles
-        * Total Capacity: $Q_u = Q_b + Q_s = {Q_b_ex2:.0f} + {Q_s_mtd:.0f} = \\mathbf{{{Q_u_mtd:.0f} \\text{{ kN}}}}$$
-        * Required Piles: $N = \\frac{{P_{{axial}} \\cdot 1000}}{{Q_u}} = \\frac{{{P_axial*1000:.0f}}}{{{Q_u_mtd:.0f}}} = \\mathbf{{{N_piles_mtd:.2f}}}$
-        """)
+        st.write(r"#### 4. Total Capacity & Number of Piles")
+        st.latex(rf"Q_u = Q_b + Q_s = {Q_b_ex2:.0f} + {Q_s_mtd:.0f} = {Q_u_mtd:.0f} \text{{ kN}}")
+        st.latex(rf"N = \frac{{P_{{axial}} \cdot 1000}}{{Q_u}} = \frac{{{P_axial*1000:.0f}}}{{{Q_u_mtd:.0f}}} = {N_piles_mtd:.2f}")
 
     st.markdown("---")
     st.subheader("📋 Dynamic Soil Classification Table (Calculated from CPT Data)")
@@ -337,29 +332,26 @@ with tab_ex1:
     res_col4.metric("Req. Piles (FOS=1)", f"{N_required_ex1:.2f}")
 
     with st.expander("📖 **Step-by-Step Calculation Details (Broms 1966 Static Method)**", expanded=False):
-        st.markdown(f"""
-        #### 1. End Bearing Capacity ($Q_b$)
-        $$Q_b = A_b \\cdot \\sigma'_b \\cdot (N_q - 1)$$
-        * Area: $A_b = \\frac{{\\pi}}{{4}} ({D_0:.2f})^2 = {A_b:.4f} \\text{{ m}}^2$
-        * Effective Overburden Stress at Pile Tip: $\\sigma'_b = {sigma_b_eff:.2f} \\text{{ kPa}}$
-        * Bearing Capacity Factor: $N_q = {N_q}$
-        * Base Capacity:
-          $$Q_b = {A_b:.4f} \\times {sigma_b_eff:.2f} \\times ({N_q} - 1) = \\mathbf{{{Q_b_ex1:.0f} \\text{{ kN}}}}$$
+        st.write(r"#### 1. End Bearing Capacity ($Q_b$)")
+        st.latex(r"Q_b = A_b \cdot \sigma'_b \cdot (N_q - 1)")
+        st.write(f"* Area: $A_b = \\frac{{\\pi}}{{4}} ({D_0:.2f})^2 = {A_b:.4f} \\text{{ m}}^2$")
+        st.write(f"* Effective Overburden Stress at Pile Tip: $\\sigma'_b = {sigma_b_eff:.2f} \\text{{ kPa}}$")
+        st.write(f"* Bearing Capacity Factor: $N_q = {N_q}$")
+        st.latex(rf"Q_b = {A_b:.4f} \times {sigma_b_eff:.2f} \times ({N_q} - 1) = {Q_b_ex1:.0f} \text{{ kN}}")
 
-        #### 2. Shaft Friction ($Q_s$) by Layers
-        $$Q_s = \\pi D_0 \\sum \\left( K_s \\cdot \\tan\\delta_{{cv}} \\int \\sigma'_v dz \\right)$$
-        * **Layer 1 (0 to {H_top}m):**
-          * $\\int \\sigma'_v dz = \\frac{{1}}{{2}} \\cdot \\gamma'_{{sub1}} \\cdot H_1^2 = \\frac{{1}}{{2}} \\times {gamma_sub1:.1f} \\times {H_top}^2 = {int_sigma_v1:.1f} \\text{{ kPa}}\\cdot\\text{{m}}$
-          * Unit Shaft Force: $q_{{s1}} = {K_s1} \\times \\tan({delta_cv}^\\circ) \\times {int_sigma_v1:.1f} = {Q_s_layer1:.2f} \\text{{ kN/m}}$
-        * **Layer 2 ({H_top}m to {L_p}m):**
-          * $\\int \\sigma'_v dz = \\frac{{1}}{{2}} \\cdot \\gamma'_{{sub2}} \\cdot (L_p^2 - H_1^2) = \\frac{{1}}{{2}} \\times {gamma_sub2:.1f} \\times ({L_p}^2 - {H_top}^2) = {int_sigma_v2:.1f} \\text{{ kPa}}\\cdot\\text{{m}}$
-          * Unit Shaft Force: $q_{{s2}} = {K_s2} \\times \\tan({delta_cv}^\\circ) \\times {int_sigma_v2:.1f} = {Q_s_layer2:.2f} \\text{{ kN/m}}$
-        * **Total Shaft Capacity:**
-          $$Q_s = \\pi \\times {D_0:.2f} \\times ({Q_s_layer1:.2f} + {Q_s_layer2:.2f}) = \\mathbf{{{Q_s_ex1:.0f} \\text{{ kN}}}}$$
+        st.write(r"#### 2. Shaft Friction ($Q_s$) by Layers")
+        st.latex(r"Q_s = \pi D_0 \sum \left( K_s \cdot \tan\delta_{cv} \int \sigma'_v dz \right)")
+        st.write(f"**Layer 1 (0 to {H_top}m):**")
+        st.latex(rf"\int \sigma'_v dz = \frac{{1}}{{2}} \cdot \gamma'_{{sub1}} \cdot H_1^2 = \frac{{1}}{{2}} \times {gamma_sub1:.1f} \times {H_top}^2 = {int_sigma_v1:.1f} \text{{ kPa}}\cdot\text{{m}}")
+        st.latex(rf"q_{{s1}} = {K_s1} \times \tan({delta_cv}^\circ) \times {int_sigma_v1:.1f} = {Q_s_layer1:.2f} \text{{ kN/m}}")
+        st.write(f"**Layer 2 ({H_top}m to {L_p}m):**")
+        st.latex(rf"\int \sigma'_v dz = \frac{{1}}{{2}} \cdot \gamma'_{{sub2}} \cdot (L_p^2 - H_1^2) = \frac{{1}}{{2}} \times {gamma_sub2:.1f} \times ({L_p}^2 - {H_top}^2) = {int_sigma_v2:.1f} \text{{ kPa}}\cdot\text{{m}}")
+        st.latex(rf"q_{{s2}} = {K_s2} \times \tan({delta_cv}^\circ) \times {int_sigma_v2:.1f} = {Q_s_layer2:.2f} \text{{ kN/m}}")
+        st.write("**Total Shaft Capacity:**")
+        st.latex(rf"Q_s = \pi \times {D_0:.2f} \times ({Q_s_layer1:.2f} + {Q_s_layer2:.2f}) = {Q_s_ex1:.0f} \text{{ kN}}")
 
-        #### 3. Total Capacity ($Q_u$)
-        $$Q_u = Q_b + Q_s = {Q_b_ex1:.0f} + {Q_s_ex1:.0f} = \\mathbf{{{Q_u_ex1:.0f} \\text{{ kN}}}}$$
-        """)
+        st.write(r"#### 3. Total Capacity ($Q_u$)")
+        st.latex(rf"Q_u = Q_b + Q_s = {Q_b_ex1:.0f} + {Q_s_ex1:.0f} = {Q_u_ex1:.0f} \text{{ kN}}")
 
 # =========================================================
 # STEP 3: DYNAMIC SOIL STIFFNESS
@@ -387,23 +379,21 @@ with tab_ex3:
     m8.metric("Natural Freq. ($f_n$)", f"{f_n:.2f} Hz")
 
     with st.expander("📖 **Step-by-Step Calculation Details (Dynamic Soil Stiffness)**", expanded=False):
-        st.markdown(f"""
-        #### 1. Mean Confining Stress ($p'$) & Initial Shear Modulus ($G_0$)
-        * $p' = \\frac{{1 + 2 K_0}}{{3}} \\cdot \\sigma'_{{v0, 4m}} = \\frac{{1 + 2({K_0})}}{{3}} \\times {sigma_v0_4m:.2f} = \\mathbf{{{p_prime:.2f} \\text{{ kPa}}}}$
-        * $G_0 = 100 \\left(\\frac{{(3 - e)^2}}{{1 + e}}\\right) \\sqrt{{\\frac{{p'}}{{1000}}}} = 100 \\left(\\frac{{(3 - {e_silty:.2f})^2}}{{1 + {e_silty:.2f}}}\\right) \\sqrt{{\\frac{{{p_prime:.2f}}}{{1000}}}} = \\mathbf{{{G_0:.2f} \\text{{ MPa}}}}$
+        st.write(r"#### 1. Mean Confining Stress ($p'$) & Initial Shear Modulus ($G_0$)")
+        st.latex(rf"p' = \frac{{1 + 2 K_0}}{{3}} \cdot \sigma'_{{v0, 4m}} = \frac{{1 + 2({K_0})}}{{3}} \times {sigma_v0_4m:.2f} = {p_prime:.2f} \text{{ kPa}}")
+        st.latex(rf"G_0 = 100 \left(\frac{{(3 - e)^2}}{{1 + e}}\right) \sqrt{{\frac{{p'}}{{1000}}}} = 100 \left(\frac{{(3 - {e_silty:.2f})^2}}{{1 + {e_silty:.2f}}}\right) \sqrt{{\frac{{{p_prime:.2f}}}{{1000}}}} = {G_0:.2f} \text{{ MPa}}")
 
-        #### 2. Design Shear Stress ($\tau_{{max}}$) & Shear Strain ($\gamma$)
-        * Depth Reduction Factor ($r_d$ at $z=4\\text{{m}}$): $r_d = 1 - 0.01(4) = {r_d:.2f}$
-        * Seismic Shear Stress: $\\tau_{{max}} = 0.65 \\cdot a_g \\cdot \\sigma_{{v0, total}} \\cdot r_d = 0.65 \\times {a_g} \\times 68.0 \\times {r_d:.2f} = \\mathbf{{{tau_max:.2f} \\text{{ kPa}}}}$
-        * Solved Shear Strain ($\gamma$ via Hyperbolic Model): $\\gamma = \\mathbf{{{gamma_percent:.4f} \\%}}$
+        st.write(r"#### 2. Design Shear Stress ($\tau_{max}$) & Shear Strain ($\gamma$)")
+        st.write(f"* Depth Reduction Factor ($r_d$ at $z=4\\text{{m}}$): $r_d = 1 - 0.01(4) = {r_d:.2f}$")
+        st.latex(rf"\tau_{{max}} = 0.65 \cdot a_g \cdot \sigma_{{v0, total}} \cdot r_d = 0.65 \times {a_g} \times 68.0 \times {r_d:.2f} = {tau_max:.2f} \text{{ kPa}}")
+        st.write(f"* Solved Shear Strain ($\\gamma$ via Hyperbolic Model): **\\gamma = {gamma_percent:.4f} %**")
 
-        #### 3. Secant Modulus ($G_s$, $E_s$) & Wave Velocity ($v_s$)
-        * Modulus Reduction Ratio: $\\frac{{G_s}}{{G_0}} = \\frac{{1}}{{\\left(1 + \\frac{{\\gamma}}{{\\gamma_r}}\\right)^c}} = \\mathbf{{{G_ratio*100:.2f} \\%}}$
-        * Secant Shear Modulus: $G_s = {G_ratio:.4f} \\times {G_0:.2f} = \\mathbf{{{G_s:.2f} \\text{{ MPa}}}}$
-        * Young's Modulus ($\nu=0.5$): $E_s = 2 G_s (1 + \\nu) = 3 G_s = \\mathbf{{{E_s:.2f} \\text{{ MPa}}}}$
-        * Shear Wave Velocity: $v_s = \\sqrt{{\\frac{{G_s}}{\\rho}}} = \\sqrt{{\\frac{{{G_s*1e6:.0f}}}{{1700}}}} = \\mathbf{{{v_s:.2f} \\text{{ m/s}}}}$
-        * Natural Frequency: $f_n = \\frac{{v_s}}{{4 H_1}} = \\frac{{{v_s:.2f}}}{{4 \\times {H_top}}} = \\mathbf{{{f_n:.2f} \\text{{ Hz}}}}$
-        """)
+        st.write(r"#### 3. Secant Modulus ($G_s$, $E_s$) & Wave Velocity ($v_s$)")
+        st.latex(rf"\frac{{G_s}}{{G_0}} = \frac{{1}}{{\left(1 + \frac{{\gamma}}{{\gamma_r}}\right)^c}} = {G_ratio*100:.2f} \%")
+        st.latex(rf"G_s = {G_ratio:.4f} \times {G_0:.2f} = {G_s:.2f} \text{{ MPa}}")
+        st.latex(rf"E_s = 2 G_s (1 + \nu) = 3 G_s = {E_s:.2f} \text{{ MPa}}")
+        st.latex(rf"v_s = \sqrt{{\frac{{G_s}}{{\rho}}}} = \sqrt{{\frac{{{G_s*1e6:.0f}}}{{1700}}}} = {v_s:.2f} \text{{ m/s}}")
+        st.latex(rf"f_n = \frac{{v_s}}{{4 H_1}} = \frac{{{v_s:.2f}}}{{4 \times {H_top}}} = {f_n:.2f} \text{{ Hz}}")
 
 # =========================================================
 # STEP 4: ACTIVE LENGTH & FLEXIBILITY
@@ -452,25 +442,22 @@ with tab_ex4:
     col_e8.metric("Relative Length ($Z_u$)", f"{Z_u:.2f} ({classify_behavior(Z_u)})")
 
     with st.expander("📖 **Step-by-Step Calculation Details (Active Length & Flexibility)**", expanded=False):
-        st.markdown(f"""
-        #### 1. Pile Cross-sectional Properties
-        * Inner Diameter: $D_i = D_0 - 2t = {D_0:.3f} - 2({t_wall:.3f}) = {D_i:.3f} \\text{{ m}}$
-        * Moment of Inertia: $I_p = \\frac{{\\pi}}{{64}} (D_0^4 - D_i^4) = \\mathbf{{{I_p:.6f} \\text{{ m}}^4}}$
-        * Flexural Rigidity: $E_p I_p = {E_pile} \\times 10^9 \\times {I_p:.6f} = \\mathbf{{{E_I/1e6:.2f} \\text{{ MN}}\\cdot\\text{{m}}^2}}$
+        st.write(r"#### 1. Pile Cross-sectional Properties")
+        st.write(f"* Inner Diameter: $D_i = D_0 - 2t = {D_0:.3f} - 2({t_wall:.3f}) = {D_i:.3f} \\text{{ m}}$")
+        st.latex(rf"I_p = \frac{{\pi}}{{64}} (D_0^4 - D_i^4) = {I_p:.6f} \text{{ m}}^4")
+        st.latex(rf"E_p I_p = {E_pile} \times 10^9 \times {I_p:.6f} = {E_I/1e6:.2f} \text{{ MN}}\cdot\text{{m}}^2")
 
-        #### 2. Effective Active Length ($L_{{ad}}$)
-        $$L_{{ad}} = 2 D_0 \\left( \\frac{{E_p}}{{E_{{sD}}}} \\right)^n$$
-        * Soil Modulus at Active Depth ($10 D_0 = {10*D_0:.2f}\\text{{m}}$): $E_{{sD}} = \\mathbf{{{E_sD:.2f} \\text{{ MPa}}}}$
-        * Assigned Exponent: $n = {exponent}$
-        * Active Length:
-          $$L_{{ad}} = 2({D_0:.2f}) \\left( \\frac{{{E_p_corrected \\times 10^9}}}{{{E_sD \\times 10^6}}} \\right)^{{{exponent}}} = \\mathbf{{{L_ad:.2f} \\text{{ m}}}}$$
+        st.write(r"#### 2. Effective Active Length ($L_{ad}$)")
+        st.latex(r"L_{ad} = 2 D_0 \left( \frac{E_p}{E_{sD}} \right)^n")
+        st.write(f"* Soil Modulus at Active Depth ($10 D_0 = {10*D_0:.2f}\\text{{m}}$): $E_{{sD}} = {E_sD:.2f} \\text{{ MPa}}$")
+        st.write(f"* Assigned Exponent: $n = {exponent}$")
+        st.latex(rf"L_{{ad}} = 2({D_0:.2f}) \left( \frac{{{E_p_corrected \times 10^9}}}{{{E_sD \times 10^6}}} \right)^{{{exponent}}} = {L_ad:.2f} \text{{ m}}")
 
-        #### 3. Pile Flexibility Criteria ($T$ and $Z = L/T$)
-        $$T = \\left( \\frac{{E_p I_p}}{{k_h}} \\right)^{{0.2}}$$
-        * **Lower Bound ($k_h = 200 \\text{{ kN/m}}^3$):**
-          * $T_u = \\left( \\frac{{{E_I:.0f}}}{{200,000}} \\right)^{{0.2}} = {T_u:.3f} \\text{{ m}}$
-          * Relative Length: $Z_L = \\frac{{{L_p}}}{{{T_u:.3f}}} = \\mathbf{{{Z_L:.2f}}}$ $\\rightarrow$ **{classify_behavior(Z_L)}**
-        * **Upper Bound ($k_h = 2000 \\text{{ kN/m}}^3$):**
-          * $T_l = \\left( \\frac{{{E_I:.0f}}}{{2,000,000}} \\right)^{{0.2}} = {T_l:.3f} \\text{{ m}}$
-          * Relative Length: $Z_u = \\frac{{{L_p}}}{{{T_l:.3f}}} = \\mathbf{{{Z_u:.2f}}}$ $\\rightarrow$ **{classify_behavior(Z_u)}**
-        """)
+        st.write(r"#### 3. Pile Flexibility Criteria ($T$ and $Z = L/T$)")
+        st.latex(r"T = \left( \frac{E_p I_p}{k_h} \right)^{0.2}")
+        st.write(r"**Lower Bound ($k_h = 200 \text{ kN/m}^3$):**")
+        st.latex(rf"T_u = \left( \frac{{{E_I:.0f}}}{{200,000}} \right)^{{0.2}} = {T_u:.3f} \text{{ m}}")
+        st.write(f"* Relative Length: $Z_L = \\frac{{{L_p}}}{{{T_u:.3f}}} = {Z_L:.2f} \\rightarrow$ **{classify_behavior(Z_L)}**")
+        st.write(r"**Upper Bound ($k_h = 2000 \text{ kN/m}^3$):**")
+        st.latex(rf"T_l = \left( \frac{{{E_I:.0f}}}{{2,000,000}} \right)^{{0.2}} = {T_l:.3f} \text{{ m}}")
+        st.write(f"* Relative Length: $Z_u = \\frac{{{L_p}}}{{{T_l:.3f}}} = {Z_u:.2f} \\rightarrow$ **{classify_behavior(Z_u)}**")
