@@ -510,3 +510,59 @@ with tab_ex4:
         col_e6.metric("Relative Length ($Z_L$)", f"{Z_L:.2f} ({classify_behavior(Z_L)})")
         col_e7.metric("Elastic Length ($T_l$, Upper)", f"{T_l:.3f} m")
         col_e8.metric("Relative Length ($Z_u$)", f"{Z_u:.2f} ({classify_behavior(Z_u)})")
+
+        # =========================================================
+        # EXPANDER: STEP-BY-STEP CALCULATION DETAILS (TAB 4)
+        # =========================================================
+        with st.expander("📖 Step-by-Step Calculation Details (Tab 4: Active Length & Flexibility)"):
+            st.markdown("### 1. Pile Flexural Rigidity ($E_p I_p$) & Diameter Correction")
+            st.latex(r"I_p = \frac{\pi}{64} \left( D_0^4 - D_i^4 \right)")
+            if "Steel" in pile_type:
+                st.write(f"* **Inner Diameter ($D_i$):** $D_0 - 2t = {D_0:.3f} - 2({t_wall:.3f}) = {D_i:.3f} \\text{{ m}}$")
+                st.write(f"* **Moment of Inertia ($I_p$):** ${I_p:.6f} \\text{{ m}}^4$")
+                st.latex(r"E_{p,\text{corrected}} = \frac{E_p}{\frac{D_0^4}{D_0^4 - D_i^4}}")
+                st.write(f"* **Corrected Pile Elastic Modulus ($E_{{p,\\text{{corrected}}}}$):** ${E_p_corrected:.2f} \\text{{ GPa}}$")
+            else:
+                st.write(f"* **Solid Pile Section ($I_p$):** ${I_p:.6f} \\text{{ m}}^4$")
+                st.write(f"* **Design Pile Modulus ($E_p$):** ${E_p_corrected:.2f} \\text{{ GPa}}$")
+
+            st.markdown("---")
+            st.markdown("### 2. Operational Soil Shear Modulus ($G_{sD}$) and Young's Modulus ($E_{sD}$)")
+            st.latex(r"\sigma'_{v0} = 7.0 \times D_0")
+            st.latex(r"p' = \left(\frac{1 + 2K_0}{3}\right) \sigma'_{v0}")
+            st.latex(r"G_0 = 100 \cdot \frac{(3 - e)^2}{1 + e} \cdot \sqrt{\frac{p'}{1000}} \quad (\text{MPa})")
+            st.latex(r"G_{sD} = \left(\frac{G}{G_0}\right) \times G_0, \quad E_{sD} = 3 \times G_{sD}")
+            
+            st.write(f"* **Effective Stress at $D_0$ ($\sigma'_{{v0}}$):** ${sigma_v0_D0:.2f} \\text{{ kPa}}$")
+            st.write(f"* **Mean Effective Stress ($p'$):** ${p_prime_D0:.2f} \\text{{ kPa}}$")
+            st.write(f"* **Small-Strain Shear Modulus ($G_0$):** ${G_0_D0:.2f} \\text{{ MPa}}$")
+            st.write(f"* **Degraded Shear Modulus ($G_{{sD}}$):** ${G_s_D0:.2f} \\text{{ MPa}}$")
+            st.write(f"* **Operational Soil Modulus ($E_{{sD}}$):** ${E_sD:.2f} \\text{{ MPa}}$")
+
+            st.markdown("---")
+            st.markdown("### 3. Effective Active Length ($L_{ad}$)")
+            st.latex(r"L_{ad} = 2 \cdot D_0 \cdot \left( \frac{E_p}{E_{sD}} \right)^n")
+            st.write(f"* **Selected Exponent ($n$):** ${exponent:.2f}$")
+            st.write(f"* **Effective Active Depth ($L_{{ad}}$):** $2 \\times {D_0:.2f} \\times \\left(\\frac{{{E_p_corrected \times 1000:.1f}}}{{{E_sD:.2f}}}\\right)^{{{exponent:.2f}}} = \\mathbf{{{L_ad:.2f}\\text{{ m}}}}$")
+
+            st.markdown("---")
+            st.markdown("### 4. Subgrade Modulus Gradient ($k$) & Relative Length ($Z = L/T$)")
+            
+            if "Option 1" in k_mode:
+                st.latex(r"T = \left( \frac{E_p I_p}{k} \right)^{0.2}")
+                st.latex(r"Z = \frac{L_p}{T}")
+                st.write(f"* **Design Modulus Gradient ($k$):** ${k_nominal:.0f} \\text{{ kN/m³}}$")
+                st.write(f"* **Characteristic Elastic Length ($T$):** ${T_nom:.3f} \\text{{ m}}$")
+                st.write(f"* **Relative Length Ratio ($Z$):** ${Z_nom:.2f}$ $\\rightarrow$ **{classify_behavior(Z_nom)} Behavior**")
+            else:
+                st.latex(r"T_u = \left( \frac{E_p I_p}{k_{\text{lower}}} \right)^{0.2}, \quad T_l = \left( \frac{E_p I_p}{k_{\text{upper}}} \right)^{0.2}")
+                st.write(f"* **Lower Bound $k_{\\text{{lower}}}$:** ${k_lower:.0f} \\text{{ kN/m³}} \\rightarrow T_u = {T_u:.3f} \\text{{ m}}, \\, Z_L = {Z_L:.2f}$ ({classify_behavior(Z_L)})")
+                st.write(f"* **Upper Bound $k_{\\text{{upper}}}$:** ${k_upper:.0f} \\text{{ kN/m³}} \\rightarrow T_l = {T_l:.3f} \\text{{ m}}, \\, Z_u = {Z_u:.2f}$ ({classify_behavior(Z_u)})")
+
+            st.markdown("---")
+            st.markdown("### 5. Classification Criteria (Flexible vs. Rigid)")
+            st.markdown("""
+            * **$Z > 5.0$:** Flexible Pile Behavior (Pile Top Deflection is Independent of Tip Boundary Conditions).
+            * **$2.5 \le Z \le 5.0$:** Semi-Flexible / Intermediate Behavior.
+            * **$Z < 2.5$:** Rigid Pile Behavior (Short Stubby Pile Rotation).
+            """)
