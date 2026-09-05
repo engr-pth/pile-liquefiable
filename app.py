@@ -43,12 +43,33 @@ def classify_soil_behavior(soil_type, qc):
 # Main Input Section
 # ---------------------------------------------------------
 with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/Collapse)**", expanded=True):
-    col_p1, col_p2, col_p3 = st.columns([1, 1.4, 1.2])
+    col_p1, col_p2, col_p3 = st.columns([1.1, 1.3, 1.2])
     
     with col_p1:
         st.subheader("1. Pile Properties")
-        pile_type = st.selectbox("Select Pile Type", ["Steel Pipe Pile", "Bored Concrete Pile"])
-        D_0 = st.number_input("Pile Diameter, $D_0$ (m)", value=0.75, step=0.05)
+        
+        # 1. Pile Type Dropdown ပြင်ဆင်ခြင်း
+        pile_type = st.selectbox(
+            "Select Pile Type", 
+            ["Closed-end Steel Pipe Pile", "Closed-end Spun Concrete Pile"]
+        )
+        
+        D_0 = st.number_input("Pile Outer Diameter, $D_0$ (m)", value=0.75, step=0.05)
+        
+        # 2. Pile Type ပေါ်မူတည်၍ Elastic Modulus & Parameters ယူခြင်း
+        if "Steel" in pile_type:
+            t_wall = st.number_input("Wall Thickness, $t$ (m)", value=0.012, step=0.001, format="%.3f")
+            E_pile = 210.0  # GPa (Steel)
+            delta_cv = 20.0 # Steel-Soil Interface Friction Angle
+            st.caption("ℹ️ **Steel Pipe:** $E_p = 210$ GPa, $\\delta_{cv} = 20^\circ$")
+        else:
+            # Closed-end Spun Concrete Pile
+            t_wall = st.number_input("Wall Thickness, $t$ (m)", value=0.090, step=0.005, format="%.3f") # e.g. 90mm wall for Spun Pile
+            fc_prime = st.number_input("Concrete Strength, $f'_c$ (MPa)", value=60.0, step=5.0) # High-Strength PHC Spun Pile
+            E_pile = (4700 * np.sqrt(fc_prime)) / 1000.0  # GPa
+            delta_cv = 26.25 # Concrete-Soil Interface Friction Angle
+            st.caption(f"ℹ️ **Spun Concrete:** $E_p = {E_pile:.2f}$ GPa, $\\delta_{{cv}} = 26.25^\circ$")
+
         L_p = st.number_input("Pile Length, $L_p$ (m)", value=20.0, step=1.0)
         P_axial = st.number_input("Axial Load (MN)", value=9.4, step=0.1)
 
@@ -155,16 +176,6 @@ with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/
         M_w = st.number_input("Earthquake Magnitude, $M_w$", value=6.0, step=0.1)
         apply_msf = st.checkbox("Apply MSF to $\\tau_{max}$?", value=False)
 
-if pile_type == "Steel Pipe Pile":
-    t_wall = 0.012
-    E_pile = 210.0
-    delta_cv = 20.0
-else:
-    t_wall = D_0 / 2.0
-    fc_prime = 30.0
-    E_pile = (4700 * np.sqrt(fc_prime)) / 1000.0
-    delta_cv = 26.25
-
 # ---------------------------------------------------------
 # Dynamic Calculations
 # ---------------------------------------------------------
@@ -199,13 +210,15 @@ tab_ex2, tab_ex1, tab_ex3, tab_ex4 = st.tabs([
 ])
 
 # =========================================================
-# STEP 1: CPT METHOD
+# STEP 1: CPT METHOD (Jardine & Chow 1996 / ICP Method for Closed-end Driven Piles)
 # =========================================================
 with tab_ex2:
-    st.subheader("6.2.2 CPT-Based Axial Pile Capacity & Soil Profile Table")
+    st.subheader(f"6.2.2 CPT-Based Axial Capacity ({pile_type})")
     
-    d_cone = 25.4
+    d_cone = 25.4  # Cone equivalent diameter (mm)
     qc_tip_book = qc_values[-1]
+    
+    # ICP Method End Bearing Factor for Closed-End Displacement Piles
     qb_qc_ratio = max(1 - 0.5 * np.log10((D_0 * 1000) / d_cone), 0.13)
     q_b_cpt = qb_qc_ratio * qc_tip_book
     Q_b_ex2 = q_b_cpt * ((np.pi / 4) * (D_0 ** 2)) * 1000
@@ -254,14 +267,14 @@ with tab_ex1:
     N_q = 40  
     Q_b_ex1 = A_b * sigma_b_eff * (N_q - 1)
 
-    if pile_type == "Steel Pipe Pile":
-        K_s1, K_s2, delta_deg = 0.5, 1.0, 20.0
+    if "Steel" in pile_type:
+        K_s1, K_s2 = 0.5, 1.0
         st.info("ℹ️ **Broms (1966) Steel Parameters:** $\\delta_{cv} = 20^\\circ$, $K_{s1}=0.5$, $K_{s2}=1.0$")
     else:
-        K_s1, K_s2, delta_deg = 1.0, 2.0, 0.75 * 35.0
+        K_s1, K_s2 = 1.0, 2.0
         st.info("ℹ️ **Broms (1966) Concrete Parameters:** $\\delta_{cv} = 26.25^\\circ$, $K_{s1}=1.0$, $K_{s2}=2.0$")
 
-    tan_delta = np.tan(np.radians(delta_deg))
+    tan_delta = np.tan(np.radians(delta_cv))
     Q_s_layer1 = K_s1 * tan_delta * (0.5 * 1.27 * (H_top**2))
     Q_s_layer2 = K_s2 * tan_delta * (0.5 * 3.28 * (L_p**2 - H_top**2))
     
@@ -306,13 +319,14 @@ with tab_ex3:
 with tab_ex4:
     st.subheader(f"6.3.2 Effective Active Length and Pile Flexibility ({pile_type})")
 
-    if pile_type == "Steel Pipe Pile":
-        D_i = D_0 - (2 * t_wall)
+    # Hollow Section Moment of Inertia (I_p) Calculation
+    D_i = D_0 - (2 * t_wall)
+    I_p = (np.pi / 64) * (D_0**4 - D_i**4)
+    
+    if "Steel" in pile_type:
         E_p_corrected = E_pile / ((D_0**4) / (D_0**4 - D_i**4))
-        I_p = (np.pi / 64) * (D_0**4 - D_i**4)
     else:
         E_p_corrected = E_pile
-        I_p = (np.pi / 64) * (D_0**4)
 
     sigma_v0_D0 = 7.0 * D_0  
     p_prime_D0 = ((1 + 2 * K_0) / 3) * sigma_v0_D0
