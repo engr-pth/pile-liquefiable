@@ -32,51 +32,50 @@ def solve_shear_strain(tau_target, G0_kpa, gamma_r=2e-4, c=0.79):
     return mid
 
 # ---------------------------------------------------------
-# Sidebar Inputs & CPT-based e Correlation Logic
+# Main Page Input Section (Replacing Sidebar)
 # ---------------------------------------------------------
-st.sidebar.header("⚙️ Design Parameters")
+with st.expander("⚙️ **Design Parameters & Settings (Click to Expand/Collapse)**", expanded=True):
+    col_p1, col_p2, col_p3 = st.columns(3)
+    
+    with col_p1:
+        st.subheader("1. Pile Properties")
+        pile_type = st.selectbox("Select Pile Type", ["Steel Pipe Pile", "Bored Concrete Pile"])
+        D_0 = st.number_input("Pile Diameter, $D_0$ (m)", value=0.75, step=0.05)
+        L_p = st.number_input("Pile Length, $L_p$ (m)", value=20.0, step=1.0)
+        P_axial = st.number_input("Axial Load (MN)", value=9.4, step=0.1)
 
-pile_type = st.sidebar.selectbox("Select Pile Type", ["Steel Pipe Pile", "Bored Concrete Pile"])
-D_0 = st.sidebar.number_input("Pile Diameter, $D_0$ (m)", value=0.75, step=0.05)
-L_p = st.sidebar.number_input("Pile Length, $L_p$ (m)", value=20.0, step=1.0)
-P_axial = st.sidebar.number_input("Axial Load (MN)", value=9.4, step=0.1)
+    with col_p2:
+        st.subheader("2. CPT & Soil Correlation")
+        qc_top_avg = np.mean(qc_values[1:9])  # Top 8m average qc (MPa)
+        
+        if qc_top_avg < 5.0:
+            e_correlated_top = 0.90
+        elif 5.0 <= qc_top_avg < 15.0:
+            e_correlated_top = 0.75
+        else:
+            e_correlated_top = 0.60
 
-soil_profile = st.sidebar.selectbox(
-    "Select Soil Profile Type", 
-    ["Parabolic (Sand / Silty Sand)", "Linear (Soft Clay)", "Constant (Over-consolidated Clay)"]
-)
+        use_cpt_correlation = st.checkbox("Auto-correlate Void Ratio ($e$) from CPT?", value=True)
+        
+        if use_cpt_correlation:
+            e_top = e_correlated_top
+            st.info(f"💡 Auto-correlated $e_{{top}} = {e_top:.2f}$ (from Avg $q_c = {qc_top_avg:.2f}$ MPa)")
+        else:
+            e_top = st.number_input("Manual Void Ratio (Top Layer)", value=0.90, step=0.05)
+            
+        e_bottom = st.number_input("Void Ratio (Bottom Dense Layer)", value=0.60, step=0.05)
+        soil_profile = st.selectbox("Soil Profile Type", ["Parabolic (Sand / Silty Sand)", "Linear (Soft Clay)", "Constant (OC Clay)"])
 
-st.sidebar.markdown("---")
-st.sidebar.subheader("🔗 CPT Data Correlation Settings")
+    with col_p3:
+        st.subheader("3. Dynamic Analysis")
+        a_g = st.number_input("PGA, $a_g$ (g)", value=0.2, step=0.05)
+        M_w = st.number_input("Earthquake Magnitude, $M_w$", value=6.0, step=0.1)
+        apply_msf = st.checkbox("Apply MSF to $\\tau_{max}$?", value=False)
 
-# Top 8m average qc (MPa) calculation
-qc_top_avg = np.mean(qc_values[1:9])  
-
-if qc_top_avg < 5.0:
-    e_correlated_top = 0.90  # Medium / Loose silty sand
-elif 5.0 <= qc_top_avg < 15.0:
-    e_correlated_top = 0.75  # Medium dense
-else:
-    e_correlated_top = 0.60  # Dense sand
-
-use_cpt_correlation = st.sidebar.checkbox("Auto-correlate Void Ratio ($e$) from CPT?", value=True)
-
-if use_cpt_correlation:
-    e_top = e_correlated_top
-    st.sidebar.success(f"Correlate $e_{{top}} = {e_top:.2f}$ (from Avg $q_c = {qc_top_avg:.2f}$ MPa)")
-else:
-    e_top = st.sidebar.number_input("Manual Void Ratio (Top Layer)", value=0.90, step=0.05)
-
-e_bottom = st.sidebar.number_input("Void Ratio (Bottom Dense Layer)", value=0.60, step=0.05)
 e_silty = e_top
 
-st.sidebar.markdown("---")
-a_g = st.sidebar.number_input("PGA, $a_g$ (g)", value=0.2, step=0.05)
-M_w = st.sidebar.number_input("Earthquake Magnitude, $M_w$", value=6.0, step=0.1)
-apply_msf = st.sidebar.checkbox("Apply MSF to $\\tau_{max}$?", value=False)
-
 if pile_type == "Steel Pipe Pile":
-    t_wall = st.sidebar.number_input("Pile Wall Thickness (m)", value=0.012, step=0.001)
+    t_wall = 0.012
     E_pile = 210.0
     delta_cv = 20.0
 else:
@@ -86,7 +85,7 @@ else:
     delta_cv = 26.25
 
 # ---------------------------------------------------------
-# Dynamic Shear Stress Calculation Logic
+# Dynamic Calculations
 # ---------------------------------------------------------
 K_0 = 0.46
 sigma_v0_4m = 28.0
