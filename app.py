@@ -396,10 +396,23 @@ with tab_ex3:
         st.latex(rf"f_n = \frac{{v_s}}{{4 H_1}} = \frac{{{v_s:.2f}}}{{4 \times {H_top}}} = {f_n:.2f} \text{{ Hz}}")
 
 # =========================================================
-# STEP 4: ACTIVE LENGTH & FLEXIBILITY
+# STEP 4: ACTIVE LENGTH & SSI (UPDATED WITH OPTION SELECTOR)
 # =========================================================
 with tab_ex4:
     st.subheader(f"6.3.2 Effective Active Length and Pile Flexibility ({pile_type})")
+
+    # Dynamic Section Settings for Subgrade Modulus Gradient (k)
+    st.markdown("---")
+    st.markdown("##### ⚙️ Subgrade Modulus Gradient ($k$) Selection Mode")
+    
+    k_mode = st.radio(
+        "Choose Analysis Approach for Subgrade Modulus Gradient (k):",
+        [
+            "Option 1: Single Nominal Value (Base on SPT N / CPT qc)",
+            "Option 2: Bounding Approach (Upper & Lower Bound Range)"
+        ],
+        horizontal=True
+    )
 
     D_i = D_0 - (2 * t_wall)
     I_p = (np.pi / 64) * (D_0**4 - D_i**4)
@@ -418,29 +431,55 @@ with tab_ex4:
     L_ad = 2 * D_0 * ((E_p_corrected * 1e9) / (E_sD * 1e6)) ** exponent
     E_I = (E_pile * 1e9) * I_p
 
-    k_lower, k_upper = 200.0, 2000.0
-    T_u = ((E_I) / (k_lower * 1e3)) ** 0.2
-    Z_L = L_p / T_u
-    T_l = ((E_I) / (k_upper * 1e3)) ** 0.2
-    Z_u = L_p / T_l
-
     def classify_behavior(z_val):
         if z_val > 5.0: return "Flexible"
         elif 2.5 <= z_val <= 5.0: return "Semi-Flexible"
         else: return "Rigid"
 
-    col_e1, col_e2, col_e3, col_e4 = st.columns(4)
-    col_e1.metric("Design Pile Modulus ($E_p$)", f"{E_p_corrected:.1f} GPa")
-    col_e2.metric(f"Soil Modulus ($E_{{sD}}$)", f"{E_sD:.2f} MPa")
-    col_e3.metric("Effective Active Length ($L_{ad}$)", f"{L_ad:.2f} m")
-    col_e4.metric("Flexural Rigidity ($E_p I_p$)", f"{E_I/1e6:.1f} MN·m²")
+    # Display Output according to selected Option
+    if "Option 1" in k_mode:
+        k_nominal = st.number_input(
+            "Enter Nominal Gradient of Soil Modulus, $k$ (kN/m³)", 
+            value=2200.0, step=100.0, help="Typical values: Loose (200-2000), Medium (2000-6000), Dense (>6000)"
+        )
+        T_nom = ((E_I) / (k_nominal * 1e3)) ** 0.2
+        Z_nom = L_p / T_nom
 
-    col_e5, col_e6, col_e7, col_e8 = st.columns(4)
-    col_e5.metric("Elastic Length ($T_u$, k=200)", f"{T_u:.3f} m")
-    col_e6.metric("Relative Length ($Z_L$)", f"{Z_L:.2f} ({classify_behavior(Z_L)})")
-    col_e7.metric("Elastic Length ($T_l$, k=2000)", f"{T_l:.3f} m")
-    col_e8.metric("Relative Length ($Z_u$)", f"{Z_u:.2f} ({classify_behavior(Z_u)})")
+        col_e1, col_e2, col_e3, col_e4 = st.columns(4)
+        col_e1.metric("Design Pile Modulus ($E_p$)", f"{E_p_corrected:.1f} GPa")
+        col_e2.metric(f"Soil Modulus ($E_{{sD}}$)", f"{E_sD:.2f} MPa")
+        col_e3.metric("Effective Active Length ($L_{ad}$)", f"{L_ad:.2f} m")
+        col_e4.metric("Flexural Rigidity ($E_p I_p$)", f"{E_I/1e6:.1f} MN·m²")
 
+        col_e5, col_e6 = st.columns(2)
+        col_e5.metric("Elastic Length ($T$)", f"{T_nom:.3f} m")
+        col_e6.metric("Relative Length ($Z = L/T$)", f"{Z_nom:.2f} ({classify_behavior(Z_nom)})")
+
+    else:
+        col_k1, col_k2 = st.columns(2)
+        with col_k1:
+            k_lower = st.number_input("Lower Bound $k_{lower}$ (kN/m³)", value=200.0, step=50.0)
+        with col_k2:
+            k_upper = st.number_input("Upper Bound $k_{upper}$ (kN/m³)", value=2000.0, step=100.0)
+
+        T_u = ((E_I) / (k_lower * 1e3)) ** 0.2
+        Z_L = L_p / T_u
+        T_l = ((E_I) / (k_upper * 1e3)) ** 0.2
+        Z_u = L_p / T_l
+
+        col_e1, col_e2, col_e3, col_e4 = st.columns(4)
+        col_e1.metric("Design Pile Modulus ($E_p$)", f"{E_p_corrected:.1f} GPa")
+        col_e2.metric(f"Soil Modulus ($E_{{sD}}$)", f"{E_sD:.2f} MPa")
+        col_e3.metric("Effective Active Length ($L_{ad}$)", f"{L_ad:.2f} m")
+        col_e4.metric("Flexural Rigidity ($E_p I_p$)", f"{E_I/1e6:.1f} MN·m²")
+
+        col_e5, col_e6, col_e7, col_e8 = st.columns(4)
+        col_e5.metric("Elastic Length ($T_u$, Lower)", f"{T_u:.3f} m")
+        col_e6.metric("Relative Length ($Z_L$)", f"{Z_L:.2f} ({classify_behavior(Z_L)})")
+        col_e7.metric("Elastic Length ($T_l$, Upper)", f"{T_l:.3f} m")
+        col_e8.metric("Relative Length ($Z_u$)", f"{Z_u:.2f} ({classify_behavior(Z_u)})")
+
+    # Step-by-Step Expander
     with st.expander("📖 **Step-by-Step Calculation Details (Active Length & Flexibility)**", expanded=False):
         st.write(r"#### 1. Pile Cross-sectional Properties")
         st.write(f"* Inner Diameter: $D_i = D_0 - 2t = {D_0:.3f} - 2({t_wall:.3f}) = {D_i:.3f} \\text{{ m}}$")
@@ -458,9 +497,15 @@ with tab_ex4:
 
         st.write(r"#### 3. Pile Flexibility Criteria ($T$ and $Z = L/T$)")
         st.latex(r"T = \left( \frac{E_p I_p}{k_h} \right)^{0.2}")
-        st.write(r"**Lower Bound ($k_h = 200 \text{ kN/m}^3$):**")
-        st.latex(rf"T_u = \left( \frac{{{E_I:.0f}}}{{200,000}} \right)^{{0.2}} = {T_u:.3f} \text{{ m}}")
-        st.write(f"* Relative Length: $Z_L = \\frac{{{L_p}}}{{{T_u:.3f}}} = {Z_L:.2f} \\rightarrow$ **{classify_behavior(Z_L)}**")
-        st.write(r"**Upper Bound ($k_h = 2000 \text{ kN/m}^3$):**")
-        st.latex(rf"T_l = \left( \frac{{{E_I:.0f}}}{{2,000,000}} \right)^{{0.2}} = {T_l:.3f} \text{{ m}}")
-        st.write(f"* Relative Length: $Z_u = \\frac{{{L_p}}}{{{T_l:.3f}}} = {Z_u:.2f} \\rightarrow$ **{classify_behavior(Z_u)}**")
+        
+        if "Option 1" in k_mode:
+            st.write(f"**Nominal Value ($k = {k_nominal:.0f} \\text{{ kN/m}}^3$):**")
+            st.latex(rf"T = \left( \frac{{{E_I:.0f}}}{{{k_nominal*1000:.0f}}} \right)^{{0.2}} = {T_nom:.3f} \text{{ m}}")
+            st.write(f"* Relative Length: $Z = \\frac{{{L_p}}}{{{T_nom:.3f}}} = {Z_nom:.2f} \\rightarrow$ **{classify_behavior(Z_nom)}**")
+        else:
+            st.write(f"**Lower Bound ($k_{{lower}} = {k_lower:.0f} \\text{{ kN/m}}^3$):**")
+            st.latex(rf"T_u = \left( \frac{{{E_I:.0f}}}{{{k_lower*1000:.0f}}} \right)^{{0.2}} = {T_u:.3f} \text{{ m}}")
+            st.write(f"* Relative Length: $Z_L = \\frac{{{L_p}}}{{{T_u:.3f}}} = {Z_L:.2f} \\rightarrow$ **{classify_behavior(Z_L)}**")
+            st.write(f"**Upper Bound ($k_{{upper}} = {k_upper:.0f} \\text{{ kN/m}}^3$):**")
+            st.latex(rf"T_l = \left( \frac{{{E_I:.0f}}}{{{k_upper*1000:.0f}}} \right)^{{0.2}} = {T_l:.3f} \text{{ m}}")
+            st.write(f"* Relative Length: $Z_u = \\frac{{{L_p}}}{{{T_l:.3f}}} = {Z_u:.2f} \\rightarrow$ **{classify_behavior(Z_u)}**")
