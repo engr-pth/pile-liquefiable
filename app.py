@@ -7,13 +7,6 @@ st.set_page_config(page_title="Pile Foundation Design WorkFlow", layout="wide")
 st.title("🏗️ Geotechnical & Foundation Design Workflow")
 st.caption("CPT-Based Analysis ➔ Static Empirical Capacity ➔ Dynamic Soil Stiffness ➔ SSI & Active Length")
 
-# ---------------------------------------------------------
-# Raw Field CPT Data (Example Site Investigation Data)
-# ---------------------------------------------------------
-depths = np.arange(0, 21, 1)
-sigma_v0 = [0, 7, 14, 21, 28, 35, 42, 49, 56, 81, 90, 99, 108, 117, 126, 135, 144, 153, 162, 171, 180]
-qc_values = [0, 0.74, 1.19, 1.81, 1.82, 2.41, 2.79, 3.25, 3.43, 12.85, 13.77, 16.03, 17.94, 19.07, 17.88, 24.94, 20.93, 23.71, 22.97, 26.59, 28.89]
-
 def integrate_trapz(y, x):
     try:
         return np.trapezoid(y, x)
@@ -31,11 +24,19 @@ def solve_shear_strain(tau_target, G0_kpa, gamma_r=2e-4, c=0.79):
             high = mid
     return mid
 
+def correlate_void_ratio(qc_avg):
+    if qc_avg < 5.0:
+        return 0.90  # Loose / Medium Silty Sand
+    elif 5.0 <= qc_avg < 15.0:
+        return 0.75  # Medium Dense Sand
+    else:
+        return 0.60  # Dense Sand
+
 # ---------------------------------------------------------
-# Main Page Input Section (Replacing Sidebar)
+# Main Input Section
 # ---------------------------------------------------------
-with st.expander("⚙️ **Design Parameters & Settings (Click to Expand/Collapse)**", expanded=True):
-    col_p1, col_p2, col_p3 = st.columns(3)
+with st.expander("⚙️ **Design Parameters & CPT Profile Input (Click to Expand/Collapse)**", expanded=True):
+    col_p1, col_p2, col_p3 = st.columns([1, 1.2, 1])
     
     with col_p1:
         st.subheader("1. Pile Properties")
@@ -45,29 +46,44 @@ with st.expander("⚙️ **Design Parameters & Settings (Click to Expand/Collaps
         P_axial = st.number_input("Axial Load (MN)", value=9.4, step=0.1)
 
     with col_p2:
-        st.subheader("2. CPT & Soil Correlation")
-        qc_top_avg = np.mean(qc_values[1:9])  # Top 8m average qc (MPa)
+        st.subheader("2. CPT Field Profile Data")
+        st.caption("CPT $q_c$ (MPa) တန်ဖိုးများကို အောက်ပါ Table တွင် တိုက်ရိုက် ပြင်ဆင်နိုင်ပါသည်။")
         
-        if qc_top_avg < 5.0:
-            e_correlated_top = 0.90
-        elif 5.0 <= qc_top_avg < 15.0:
-            e_correlated_top = 0.75
-        else:
-            e_correlated_top = 0.60
-
-        use_cpt_correlation = st.checkbox("Auto-correlate Void Ratio ($e$) from CPT?", value=True)
+        default_cpt_df = pd.DataFrame({
+            "Depth (m)": np.arange(0, 21, 1),
+            "Sigma_v0 (kPa)": [0, 7, 14, 21, 28, 35, 42, 49, 56, 81, 90, 99, 108, 117, 126, 135, 144, 153, 162, 171, 180],
+            "qc (MPa)": [0, 0.74, 1.19, 1.81, 1.82, 2.41, 2.79, 3.25, 3.43, 12.85, 13.77, 16.03, 17.94, 19.07, 17.88, 24.94, 20.93, 23.71, 22.97, 26.59, 28.89]
+        })
         
-        if use_cpt_correlation:
-            e_top = e_correlated_top
-            st.info(f"💡 Auto-correlated $e_{{top}} = {e_top:.2f}$ (from Avg $q_c = {qc_top_avg:.2f}$ MPa)")
-        else:
-            e_top = st.number_input("Manual Void Ratio (Top Layer)", value=0.90, step=0.05)
-            
-        e_bottom = st.number_input("Void Ratio (Bottom Dense Layer)", value=0.60, step=0.05)
-        soil_profile = st.selectbox("Soil Profile Type", ["Parabolic (Sand / Silty Sand)", "Linear (Soft Clay)", "Constant (OC Clay)"])
+        edited_cpt_df = st.data_editor(
+            default_cpt_df,
+            height=200,
+            num_rows="fixed",
+            use_container_width=True
+        )
+        
+        depths = edited_cpt_df["Depth (m)"].values
+        sigma_v0 = edited_cpt_df["Sigma_v0 (kPa)"].values
+        qc_values = edited_cpt_df["qc (MPa)"].values
 
     with col_p3:
-        st.subheader("3. Dynamic Analysis")
+        st.subheader("3. Dynamic & Correlation Settings")
+        use_cpt_correlation = st.checkbox("Auto-correlate Void Ratios ($e$) from CPT?", value=True)
+        
+        # Calculate Average qc for Top (0-8m) and Bottom (8-20m) Layers
+        qc_top_avg = np.mean(qc_values[1:9])
+        qc_bottom_avg = np.mean(qc_values[9:21])
+        
+        if use_cpt_correlation:
+            e_top = correlate_void_ratio(qc_top_avg)
+            e_bottom = correlate_void_ratio(qc_bottom_avg)
+            st.info(f"💡 **Top Layer (0-8m):** Avg $q_c = {qc_top_avg:.2f}$ MPa ➔ $e_{{top}} = {e_top:.2f}$")
+            st.info(f"💡 **Bottom Layer (8-20m):** Avg $q_c = {qc_bottom_avg:.2f}$ MPa ➔ $e_{{bottom}} = {e_bottom:.2f}$")
+        else:
+            e_top = st.number_input("Manual Void Ratio (Top Layer)", value=0.90, step=0.05)
+            e_bottom = st.number_input("Manual Void Ratio (Bottom Layer)", value=0.60, step=0.05)
+
+        soil_profile = st.selectbox("Soil Profile Type", ["Parabolic (Sand / Silty Sand)", "Linear (Soft Clay)", "Constant (OC Clay)"])
         a_g = st.number_input("PGA, $a_g$ (g)", value=0.2, step=0.05)
         M_w = st.number_input("Earthquake Magnitude, $M_w$", value=6.0, step=0.1)
         apply_msf = st.checkbox("Apply MSF to $\\tau_{max}$?", value=False)
