@@ -47,8 +47,6 @@ with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/
     
     with col_p1:
         st.subheader("1. Pile Properties")
-        
-        # 1. Pile Type Dropdown ပြင်ဆင်ခြင်း
         pile_type = st.selectbox(
             "Select Pile Type", 
             ["Closed-end Steel Pipe Pile", "Closed-end Spun Concrete Pile"]
@@ -56,16 +54,14 @@ with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/
         
         D_0 = st.number_input("Pile Outer Diameter, $D_0$ (m)", value=0.75, step=0.05)
         
-        # 2. Pile Type ပေါ်မူတည်၍ Elastic Modulus & Parameters ယူခြင်း
         if "Steel" in pile_type:
             t_wall = st.number_input("Wall Thickness, $t$ (m)", value=0.012, step=0.001, format="%.3f")
             E_pile = 210.0  # GPa (Steel)
             delta_cv = 20.0 # Steel-Soil Interface Friction Angle
             st.caption("ℹ️ **Steel Pipe:** $E_p = 210$ GPa, $\\delta_{cv} = 20^\circ$")
         else:
-            # Closed-end Spun Concrete Pile
-            t_wall = st.number_input("Wall Thickness, $t$ (m)", value=0.090, step=0.005, format="%.3f") # e.g. 90mm wall for Spun Pile
-            fc_prime = st.number_input("Concrete Strength, $f'_c$ (MPa)", value=60.0, step=5.0) # High-Strength PHC Spun Pile
+            t_wall = st.number_input("Wall Thickness, $t$ (m)", value=0.090, step=0.005, format="%.3f")
+            fc_prime = st.number_input("Concrete Strength, $f'_c$ (MPa)", value=60.0, step=5.0)
             E_pile = (4700 * np.sqrt(fc_prime)) / 1000.0  # GPa
             delta_cv = 26.25 # Concrete-Soil Interface Friction Angle
             st.caption(f"ℹ️ **Spun Concrete:** $E_p = {E_pile:.2f}$ GPa, $\\delta_{{cv}} = 26.25^\circ$")
@@ -77,14 +73,12 @@ with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/
         st.subheader("2. CPT Field Soil Test Input")
         st.caption("`Soil Type` နှင့် CPT $q_c$ (MPa) တန်ဖိုးများကို Depth အလိုက် ရိုက်ထည့်ပါ။")
         
-        # 1. Soil Density Mode ရွေးချယ်မှု ထည့်သွင်းခြင်း
         density_mode = st.radio(
             "Soil Unit Weight (γ) Selection Mode:",
             ["Auto (Correlate from CPT qc)", "Manual Input"],
             horizontal=True
         )
 
-        # Default CPT Profile Data Frame (Manual γ Column ပါဝင်အောင် ပြင်ဆင်ထားသည်)
         default_cpt_df = pd.DataFrame({
             "Depth (m)": np.arange(0, 21, 1),
             "Soil Type": ["Clay", "Clay", "Clay"] + ["Sand"] * 18,
@@ -92,7 +86,6 @@ with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/
             "γ_manual (kN/m³)": [16.0, 16.0, 16.0] + [17.0] * 6 + [18.5] * 2 + [20.0] * 10
         })
         
-        # Mode ပေါ်မူတည်၍ Manual Column ပြမပြ ထိန်းချုပ်ခြင်း
         column_config = {
             "Soil Type": st.column_config.SelectboxColumn(
                 "Soil Type",
@@ -110,7 +103,6 @@ with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/
                 required=True
             )
         else:
-            # Auto Mode တွင် γ_manual column ကို Table ထဲတွင် ဖျောက်ထားမည်
             default_cpt_df = default_cpt_df.drop(columns=["γ_manual (kN/m³)"])
 
         edited_cpt_df = st.data_editor(
@@ -139,7 +131,6 @@ with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/
             classified_descriptions.append(desc)
             e_values.append(e_val)
             
-            # Mode ပေါ်မူတည်၍ Density တန်ဖိုး ယူခြင်း
             if density_mode == "Manual Input":
                 gamma_values.append(user_gamma_manual[i])
             else:
@@ -154,9 +145,6 @@ with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/
 
         e_silty = e_values[4] if len(e_values) > 4 else 0.90
 
-        # ---------------------------------------------------------
-        # AUTO-DETLECTION & CLASSIFICATION METHOD SELECTION
-        # ---------------------------------------------------------
         method_choice = st.radio(
             "Select Soil Profile Classification Method:",
             [
@@ -165,12 +153,11 @@ with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/
             ]
         )
 
-        active_depth_limit = 10 * D_0  # Active Zone Depth Limit (e.g., 10 * 0.75 = 7.5m)
+        active_depth_limit = 10 * D_0
         active_mask = depths <= active_depth_limit
         active_descriptions = np.array(classified_descriptions)[active_mask]
 
         if "Method 1" in method_choice:
-            # Method 1 Logic: Dominant Soil Type
             sand_count = sum(1 for d in active_descriptions if "Sand" in d)
             soft_clay_count = sum(1 for d in active_descriptions if "NC" in d or "Soft" in d)
             stiff_clay_count = sum(1 for d in active_descriptions if "OC" in d or "Stiff" in d)
@@ -185,7 +172,6 @@ with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/
                 auto_profile = "Constant (OC Clay)"
                 exponent = 0.25
         else:
-            # Method 2 Logic: Weighted Average Exponent
             exponents = []
             for desc in classified_descriptions:
                 if "Sand" in desc:
@@ -240,18 +226,18 @@ tab_ex2, tab_ex1, tab_ex3, tab_ex4 = st.tabs([
 ])
 
 # =========================================================
-# STEP 1: CPT METHOD (Jardine & Chow 1996 / ICP Method for Closed-end Driven Piles)
+# STEP 1: CPT METHOD (ICP / Jardine & Chow 1996)
 # =========================================================
 with tab_ex2:
     st.subheader(f"6.2.2 CPT-Based Axial Capacity ({pile_type})")
     
-    d_cone = 25.4  # Cone equivalent diameter (mm)
+    d_cone = 25.4  # mm
     qc_tip_book = qc_values[-1]
     
-    # ICP Method End Bearing Factor for Closed-End Displacement Piles
     qb_qc_ratio = max(1 - 0.5 * np.log10((D_0 * 1000) / d_cone), 0.13)
     q_b_cpt = qb_qc_ratio * qc_tip_book
-    Q_b_ex2 = q_b_cpt * ((np.pi / 4) * (D_0 ** 2)) * 1000
+    A_b_cpt = (np.pi / 4) * (D_0 ** 2)
+    Q_b_ex2 = q_b_cpt * A_b_cpt * 1000  # kN
 
     tau_s_mtd = []
     for z, sig_v, qc in zip(depths, sigma_v0, qc_values):
@@ -272,9 +258,32 @@ with tab_ex2:
     col_c.metric("Total Capacity ($Q_u$)", f"{Q_u_mtd:.0f} kN")
     col_d.metric("Req. Piles ($N$)", f"{N_piles_mtd:.1f}")
 
+    with st.expander("📖 **Step-by-Step Calculation Details (ICP / CPT Method)**", expanded=False):
+        st.markdown(f"""
+        #### 1. Pile Base Area ($A_b$)
+        $$A_b = \\frac{{\\pi}}{{4}} D_0^2 = \\frac{{\\pi}}{{4}} ({D_0:.2f})^2 = {A_b_cpt:.4f} \\text{{ m}}^2$$
+
+        #### 2. CPT End Bearing Resistance ($q_b$)
+        * Cone equivalent diameter: $d_c = {d_cone} \\text{{ mm}}$
+        * Base Capacity Ratio:
+          $$\\frac{{q_b}}{{q_c}} = 1 - 0.5 \\log_{{10}}\\left(\\frac{{D_0 \\cdot 1000}}{{d_c}}\\right) = 1 - 0.5 \\log_{{10}}\\left(\\frac{{{D_0*1000:.0f}}}{{{d_cone}}}\\right) = {qb_qc_ratio:.3f}$$
+        * Unit End Bearing: $q_b = {qb_qc_ratio:.3f} \\times {qc_tip_book:.2f} = {q_b_cpt:.2f} \\text{{ MPa}}$
+        * Base Capacity ($Q_b$):
+          $$Q_b = q_b \\cdot A_b \\cdot 1000 = {q_b_cpt:.2f} \\times {A_b_cpt:.4f} \\times 1000 = \\mathbf{{{Q_b_ex2:.0f} \\text{{ kN}}}}$$
+
+        #### 3. Unit Shaft Friction ($\tau_s$) & Integration
+        $$\\tau_s(z) = \\left(\\frac{{q_c}}{{45}}\\right) \\left(\\frac{{\\sigma'_v}}{{100}}\\right)^{{0.13}} \\left(\\frac{{D_0}}{{z}}\\right)^{{0.38}} \\tan(\\delta_{{cv}})$$
+        * Shaft Friction Integral ($\int \\tau_s dz$): **{int_tau_mtd:.2f} kN/m**
+        * Total Shaft Capacity ($Q_s$):
+          $$Q_s = \\pi D_0 \\int \\tau_s dz = \\pi \\times {D_0:.2f} \\times {int_tau_mtd:.2f} = \\mathbf{{{Q_s_mtd:.0f} \\text{{ kN}}}}$$
+
+        #### 4. Total Capacity & Number of Piles
+        * Total Capacity: $Q_u = Q_b + Q_s = {Q_b_ex2:.0f} + {Q_s_mtd:.0f} = \\mathbf{{{Q_u_mtd:.0f} \\text{{ kN}}}}$$
+        * Required Piles: $N = \\frac{{P_{{axial}} \\cdot 1000}}{{Q_u}} = \\frac{{{P_axial*1000:.0f}}}{{{Q_u_mtd:.0f}}} = \\mathbf{{{N_piles_mtd:.2f}}}$
+        """)
+
     st.markdown("---")
     st.subheader("📋 Dynamic Soil Classification Table (Calculated from CPT Data)")
-    
     summary_df = pd.DataFrame({
         "Depth (m)": depths,
         "Selected Soil Behavior": user_soil_types,
@@ -286,57 +295,72 @@ with tab_ex2:
     st.dataframe(summary_df, use_container_width=True)
 
 # =========================================================
-# STEP 2: BROMS STATIC METHOD (DYNAMIC FORMULA)
+# STEP 2: BROMS STATIC METHOD
 # =========================================================
 with tab_ex1:
     st.subheader("6.2.1 Preliminary Design under Static Loading (Broms 1966)")
     
-    H_top = 8.0  # Layer 1 depth (m)
+    H_top = 8.0  
     A_b = (np.pi / 4) * (D_0 ** 2)
     
-    # Effective stress at pile tip
     sigma_b_eff = sigma_v0[-1]
     N_q = 40  
     Q_b_ex1 = A_b * sigma_b_eff * (N_q - 1)
 
-    # Pile Material Parameters (Broms 1966, Table 1.1)
     if "Steel" in pile_type:
         K_s1, K_s2 = 0.5, 1.0
         delta_cv = 20.0
         st.info("ℹ️ **Broms (1966) Steel Parameters:** $\\delta_{cv} = 20^\\circ$, $K_{s1}=0.5$, $K_{s2}=1.0$")
     else:
         K_s1, K_s2 = 1.0, 2.0
-        # For concrete, delta_cv = 0.75 * phi' (assuming phi' = 35° -> delta_cv = 26.25°)
         delta_cv = 26.25
         st.info("ℹ️ **Broms (1966) Concrete Parameters:** $\\delta_{cv} = 26.25^\\circ$, $K_{s1}=1.0$, $K_{s2}=2.0$")
 
-    # Effective Unit Weights (kN/m³)
-    gamma_sub1 = 17.0 - 10.0  # Layer 1 (0 to 8m)
-    gamma_sub2 = 19.0 - 10.0  # Layer 2 (8 to 20m)
-
+    gamma_sub1 = 17.0 - 10.0  
+    gamma_sub2 = 19.0 - 10.0  
     tan_delta = np.tan(np.radians(delta_cv))
 
-    # Integrations of Effective Vertical Stress (∫ σ'v dz)
     int_sigma_v1 = 0.5 * gamma_sub1 * (H_top ** 2)
     int_sigma_v2 = 0.5 * gamma_sub2 * (L_p ** 2 - H_top ** 2)
 
-    # Unit Shaft Resistance Integrals (K_s * tan(delta) * ∫ σ'v dz)
     Q_s_layer1 = K_s1 * tan_delta * int_sigma_v1
     Q_s_layer2 = K_s2 * tan_delta * int_sigma_v2
 
-    # Total Shaft Capacity Q_s = Perimeter (π * D) * Total Unit Shaft Resistance
     Q_s_ex1 = np.pi * D_0 * (Q_s_layer1 + Q_s_layer2)
-    
-    # Total Ultimate Bearing Capacity Q_u
     Q_u_ex1 = Q_b_ex1 + Q_s_ex1
     N_required_ex1 = (P_axial * 1000) / Q_u_ex1
 
-    # Display Results
     res_col1, res_col2, res_col3, res_col4 = st.columns(4)
     res_col1.metric("Base Capacity ($Q_b$)", f"{Q_b_ex1:.0f} kN")
     res_col2.metric("Shaft Capacity ($Q_s$)", f"{Q_s_ex1:.0f} kN")
     res_col3.metric("Total Capacity ($Q_u$)", f"{Q_u_ex1:.0f} kN")
     res_col4.metric("Req. Piles (FOS=1)", f"{N_required_ex1:.2f}")
+
+    with st.expander("📖 **Step-by-Step Calculation Details (Broms 1966 Static Method)**", expanded=False):
+        st.markdown(f"""
+        #### 1. End Bearing Capacity ($Q_b$)
+        $$Q_b = A_b \\cdot \\sigma'_b \\cdot (N_q - 1)$$
+        * Area: $A_b = \\frac{{\\pi}}{{4}} ({D_0:.2f})^2 = {A_b:.4f} \\text{{ m}}^2$
+        * Effective Overburden Stress at Pile Tip: $\\sigma'_b = {sigma_b_eff:.2f} \\text{{ kPa}}$
+        * Bearing Capacity Factor: $N_q = {N_q}$
+        * Base Capacity:
+          $$Q_b = {A_b:.4f} \\times {sigma_b_eff:.2f} \\times ({N_q} - 1) = \\mathbf{{{Q_b_ex1:.0f} \\text{{ kN}}}}$$
+
+        #### 2. Shaft Friction ($Q_s$) by Layers
+        $$Q_s = \\pi D_0 \\sum \\left( K_s \\cdot \\tan\\delta_{{cv}} \\int \\sigma'_v dz \\right)$$
+        * **Layer 1 (0 to {H_top}m):**
+          * $\\int \\sigma'_v dz = \\frac{{1}}{{2}} \\cdot \\gamma'_{{sub1}} \\cdot H_1^2 = \\frac{{1}}{{2}} \\times {gamma_sub1:.1f} \\times {H_top}^2 = {int_sigma_v1:.1f} \\text{{ kPa}}\\cdot\\text{{m}}$
+          * Unit Shaft Force: $q_{{s1}} = {K_s1} \\times \\tan({delta_cv}^\\circ) \\times {int_sigma_v1:.1f} = {Q_s_layer1:.2f} \\text{{ kN/m}}$
+        * **Layer 2 ({H_top}m to {L_p}m):**
+          * $\\int \\sigma'_v dz = \\frac{{1}}{{2}} \\cdot \\gamma'_{{sub2}} \\cdot (L_p^2 - H_1^2) = \\frac{{1}}{{2}} \\times {gamma_sub2:.1f} \\times ({L_p}^2 - {H_top}^2) = {int_sigma_v2:.1f} \\text{{ kPa}}\\cdot\\text{{m}}$
+          * Unit Shaft Force: $q_{{s2}} = {K_s2} \\times \\tan({delta_cv}^\\circ) \\times {int_sigma_v2:.1f} = {Q_s_layer2:.2f} \\text{{ kN/m}}$
+        * **Total Shaft Capacity:**
+          $$Q_s = \\pi \\times {D_0:.2f} \\times ({Q_s_layer1:.2f} + {Q_s_layer2:.2f}) = \\mathbf{{{Q_s_ex1:.0f} \\text{{ kN}}}}$$
+
+        #### 3. Total Capacity ($Q_u$)
+        $$Q_u = Q_b + Q_s = {Q_b_ex1:.0f} + {Q_s_ex1:.0f} = \\mathbf{{{Q_u_ex1:.0f} \\text{{ kN}}}}$$
+        """)
+
 # =========================================================
 # STEP 3: DYNAMIC SOIL STIFFNESS
 # =========================================================
@@ -362,13 +386,31 @@ with tab_ex3:
     m7.metric("Secant $E_s$", f"{E_s:.2f} MPa")
     m8.metric("Natural Freq. ($f_n$)", f"{f_n:.2f} Hz")
 
+    with st.expander("📖 **Step-by-Step Calculation Details (Dynamic Soil Stiffness)**", expanded=False):
+        st.markdown(f"""
+        #### 1. Mean Confining Stress ($p'$) & Initial Shear Modulus ($G_0$)
+        * $p' = \\frac{{1 + 2 K_0}}{{3}} \\cdot \\sigma'_{{v0, 4m}} = \\frac{{1 + 2({K_0})}}{{3}} \\times {sigma_v0_4m:.2f} = \\mathbf{{{p_prime:.2f} \\text{{ kPa}}}}$
+        * $G_0 = 100 \\left(\\frac{{(3 - e)^2}}{{1 + e}}\\right) \\sqrt{{\\frac{{p'}}{{1000}}}} = 100 \\left(\\frac{{(3 - {e_silty:.2f})^2}}{{1 + {e_silty:.2f}}}\\right) \\sqrt{{\\frac{{{p_prime:.2f}}}{{1000}}}} = \\mathbf{{{G_0:.2f} \\text{{ MPa}}}}$
+
+        #### 2. Design Shear Stress ($\tau_{{max}}$) & Shear Strain ($\gamma$)
+        * Depth Reduction Factor ($r_d$ at $z=4\\text{{m}}$): $r_d = 1 - 0.01(4) = {r_d:.2f}$
+        * Seismic Shear Stress: $\\tau_{{max}} = 0.65 \\cdot a_g \\cdot \\sigma_{{v0, total}} \\cdot r_d = 0.65 \\times {a_g} \\times 68.0 \\times {r_d:.2f} = \\mathbf{{{tau_max:.2f} \\text{{ kPa}}}}$
+        * Solved Shear Strain ($\gamma$ via Hyperbolic Model): $\\gamma = \\mathbf{{{gamma_percent:.4f} \\%}}$
+
+        #### 3. Secant Modulus ($G_s$, $E_s$) & Wave Velocity ($v_s$)
+        * Modulus Reduction Ratio: $\\frac{{G_s}}{{G_0}} = \\frac{{1}}{{\\left(1 + \\frac{{\\gamma}}{{\\gamma_r}}\\right)^c}} = \\mathbf{{{G_ratio*100:.2f} \\%}}$
+        * Secant Shear Modulus: $G_s = {G_ratio:.4f} \\times {G_0:.2f} = \\mathbf{{{G_s:.2f} \\text{{ MPa}}}}$
+        * Young's Modulus ($\nu=0.5$): $E_s = 2 G_s (1 + \\nu) = 3 G_s = \\mathbf{{{E_s:.2f} \\text{{ MPa}}}}$
+        * Shear Wave Velocity: $v_s = \\sqrt{{\\frac{{G_s}}{\\rho}}} = \\sqrt{{\\frac{{{G_s*1e6:.0f}}}{{1700}}}} = \\mathbf{{{v_s:.2f} \\text{{ m/s}}}}$
+        * Natural Frequency: $f_n = \\frac{{v_s}}{{4 H_1}} = \\frac{{{v_s:.2f}}}{{4 \\times {H_top}}} = \\mathbf{{{f_n:.2f} \\text{{ Hz}}}}$
+        """)
+
 # =========================================================
 # STEP 4: ACTIVE LENGTH & FLEXIBILITY
 # =========================================================
 with tab_ex4:
     st.subheader(f"6.3.2 Effective Active Length and Pile Flexibility ({pile_type})")
 
-    # Hollow Section Moment of Inertia (I_p) Calculation
     D_i = D_0 - (2 * t_wall)
     I_p = (np.pi / 64) * (D_0**4 - D_i**4)
     
@@ -383,7 +425,6 @@ with tab_ex4:
     G_s_D0 = G_ratio * G_0_D0  
     E_sD = 3 * G_s_D0          
 
-    # Active length calculated using the dynamic exponent value based on chosen method
     L_ad = 2 * D_0 * ((E_p_corrected * 1e9) / (E_sD * 1e6)) ** exponent
     E_I = (E_pile * 1e9) * I_p
 
@@ -409,3 +450,27 @@ with tab_ex4:
     col_e6.metric("Relative Length ($Z_L$)", f"{Z_L:.2f} ({classify_behavior(Z_L)})")
     col_e7.metric("Elastic Length ($T_l$, k=2000)", f"{T_l:.3f} m")
     col_e8.metric("Relative Length ($Z_u$)", f"{Z_u:.2f} ({classify_behavior(Z_u)})")
+
+    with st.expander("📖 **Step-by-Step Calculation Details (Active Length & Flexibility)**", expanded=False):
+        st.markdown(f"""
+        #### 1. Pile Cross-sectional Properties
+        * Inner Diameter: $D_i = D_0 - 2t = {D_0:.3f} - 2({t_wall:.3f}) = {D_i:.3f} \\text{{ m}}$
+        * Moment of Inertia: $I_p = \\frac{{\\pi}}{{64}} (D_0^4 - D_i^4) = \\mathbf{{{I_p:.6f} \\text{{ m}}^4}}$
+        * Flexural Rigidity: $E_p I_p = {E_pile} \\times 10^9 \\times {I_p:.6f} = \\mathbf{{{E_I/1e6:.2f} \\text{{ MN}}\\cdot\\text{{m}}^2}}$
+
+        #### 2. Effective Active Length ($L_{{ad}}$)
+        $$L_{{ad}} = 2 D_0 \\left( \\frac{{E_p}}{{E_{{sD}}}} \\right)^n$$
+        * Soil Modulus at Active Depth ($10 D_0 = {10*D_0:.2f}\\text{{m}}$): $E_{{sD}} = \\mathbf{{{E_sD:.2f} \\text{{ MPa}}}}$
+        * Assigned Exponent: $n = {exponent}$
+        * Active Length:
+          $$L_{{ad}} = 2({D_0:.2f}) \\left( \\frac{{{E_p_corrected \\times 10^9}}}{{{E_sD \\times 10^6}}} \\right)^{{{exponent}}} = \\mathbf{{{L_ad:.2f} \\text{{ m}}}}$$
+
+        #### 3. Pile Flexibility Criteria ($T$ and $Z = L/T$)
+        $$T = \\left( \\frac{{E_p I_p}}{{k_h}} \\right)^{{0.2}}$$
+        * **Lower Bound ($k_h = 200 \\text{{ kN/m}}^3$):**
+          * $T_u = \\left( \\frac{{{E_I:.0f}}}{{200,000}} \\right)^{{0.2}} = {T_u:.3f} \\text{{ m}}$
+          * Relative Length: $Z_L = \\frac{{{L_p}}}{{{T_u:.3f}}} = \\mathbf{{{Z_L:.2f}}}$ $\\rightarrow$ **{classify_behavior(Z_L)}**
+        * **Upper Bound ($k_h = 2000 \\text{{ kN/m}}^3$):**
+          * $T_l = \\left( \\frac{{{E_I:.0f}}}{{2,000,000}} \\right)^{{0.2}} = {T_l:.3f} \\text{{ m}}$
+          * Relative Length: $Z_u = \\frac{{{L_p}}}{{{T_l:.3f}}} = \\mathbf{{{Z_u:.2f}}}$ $\\rightarrow$ **{classify_behavior(Z_u)}**
+        """)
