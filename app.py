@@ -24,19 +24,37 @@ def solve_shear_strain(tau_target, G0_kpa, gamma_r=2e-4, c=0.79):
             high = mid
     return mid
 
-# Dynamic Void Ratio Function based on qc value
-def get_void_ratio(qc):
-    if qc < 5.0:
-        return 0.90  # Loose / Soft
-    elif 5.0 <= qc < 15.0:
-        return 0.75  # Medium Dense
+# Soil Type Multi-Parameter Correlation Rule
+SOIL_DATABASE = {
+    "NC Soft Clay": {"gamma": 16.0, "e_default": 1.10, "phi": 22.0},
+    "OC Clay": {"gamma": 18.0, "e_default": 0.70, "phi": 28.0},
+    "Loose / Silty Sand": {"gamma": 17.0, "e_default": 0.90, "phi": 30.0},
+    "Medium Dense Sand": {"gamma": 18.5, "e_default": 0.75, "phi": 34.0},
+    "Dense Sand / Granular": {"gamma": 20.0, "e_default": 0.60, "phi": 38.0},
+    "Clean Sand": {"gamma": 19.0, "e_default": 0.65, "phi": 36.0}
+}
+
+def classify_soil_and_get_e(qc, selected_type):
+    # Rule-Based Auto-Classification based on qc threshold & user selection
+    if selected_type == "Auto Classify from qc":
+        if qc < 1.5:
+            return "NC Soft Clay", 1.10, 16.0
+        elif 1.5 <= qc < 5.0:
+            return "Loose / Silty Sand", 0.90, 17.0
+        elif 5.0 <= qc < 15.0:
+            return "Medium Dense Sand", 0.75, 18.5
+        elif 15.0 <= qc < 25.0:
+            return "Clean Sand", 0.65, 19.0
+        else:
+            return "Dense Sand / Granular", 0.60, 20.0
     else:
-        return 0.60  # Dense Sand / Hard Clay
+        info = SOIL_DATABASE[selected_type]
+        return selected_type, info["e_default"], info["gamma"]
 
 # ---------------------------------------------------------
 # Main Input Section
 # ---------------------------------------------------------
-with st.expander("⚙️ **Design Parameters & CPT Profile Input (Click to Expand/Collapse)**", expanded=True):
+with st.expander("⚙️ **Design Parameters & Soil Test Data (Click to Expand/Collapse)**", expanded=True):
     col_p1, col_p2, col_p3 = st.columns([1, 1.3, 1])
     
     with col_p1:
@@ -47,12 +65,11 @@ with st.expander("⚙️ **Design Parameters & CPT Profile Input (Click to Expan
         P_axial = st.number_input("Axial Load (MN)", value=9.4, step=0.1)
 
     with col_p2:
-        st.subheader("2. CPT Field Profile Data")
-        st.caption("CPT $q_c$ (MPa) တန်ဖိုးများကို စိတ်ကြိုက် ပြင်ဆင်နိုင်ပါသည်။")
+        st.subheader("2. CPT Field Soil Test Input")
+        st.caption("Depth (m) နှင့် CPT $q_c$ (MPa) တန်ဖိုးများသာ ထည့်သွင်းရန် လိုအပ်ပါသည်။")
         
         default_cpt_df = pd.DataFrame({
             "Depth (m)": np.arange(0, 21, 1),
-            "Sigma_v0 (kPa)": [0, 7, 14, 21, 28, 35, 42, 49, 56, 81, 90, 99, 108, 117, 126, 135, 144, 153, 162, 171, 180],
             "qc (MPa)": [0, 0.74, 1.19, 1.81, 1.82, 2.41, 2.79, 3.25, 3.43, 12.85, 13.77, 16.03, 17.94, 19.07, 17.88, 24.94, 20.93, 23.71, 22.97, 26.59, 28.89]
         })
         
@@ -64,26 +81,35 @@ with st.expander("⚙️ **Design Parameters & CPT Profile Input (Click to Expan
         )
         
         depths = edited_cpt_df["Depth (m)"].values
-        sigma_v0 = edited_cpt_df["Sigma_v0 (kPa)"].values
         qc_values = edited_cpt_df["qc (MPa)"].values
 
     with col_p3:
-        st.subheader("3. Dynamic & Correlation Settings")
-        use_cpt_correlation = st.checkbox("Auto-correlate Void Ratio ($e$) from $q_c$?", value=True)
-        
-        # Calculate e for each depth point based on qc rule
-        if use_cpt_correlation:
-            e_values = [get_void_ratio(q) for q in qc_values]
-            e_silty = e_values[4]  # Mid-depth of top soft layer (~4m)
-            st.info(f"💡 **Auto-Correlated Rule:**\n- $q_c < 5$ MPa $\\implies e = 0.90$\n- $5 \\le q_c < 15$ MPa $\\implies e = 0.75$\n- $q_c \\ge 15$ MPa $\\implies e = 0.60$")
-        else:
-            manual_e = st.number_input("Manual Void Ratio ($e$)", value=0.90, step=0.05)
-            e_values = [manual_e] * len(depths)
-            e_silty = manual_e
+        st.subheader("3. Soil Type Mapping & Settings")
+        soil_override = st.selectbox(
+            "Soil Type Determination", 
+            ["Auto Classify from qc", "NC Soft Clay", "OC Clay", "Loose / Silty Sand", "Medium Dense Sand", "Clean Sand", "Dense Sand / Granular"]
+        )
 
-        # Auto-detect top layer thickness (where qc < 5 MPa)
-        top_layer_depths = [z for z, q in zip(depths, qc_values) if q < 5.0 and z > 0]
-        H_top = max(top_layer_depths) if top_layer_depths else 8.0
+        # Dynamic array calculation for Soil Classification, Void Ratio, and Overburden Stress
+        classified_types = []
+        e_values = []
+        gamma_values = []
+        
+        for q in qc_values:
+            s_type, e_val, g_val = classify_soil_and_get_e(q, soil_override)
+            classified_types.append(s_type)
+            e_values.append(e_val)
+            gamma_values.append(g_val)
+
+        # Automatic Effective Stress Sigma_v0 calculation (Cumulative integration)
+        sigma_v0 = [0.0]
+        for i in range(1, len(depths)):
+            dz = depths[i] - depths[i-1]
+            gamma_eff = max(gamma_values[i] - 9.81, 7.0)  # Submerged effective unit weight
+            sigma_v0.append(sigma_v0[-1] + gamma_eff * dz)
+
+        e_silty = e_values[4] if len(e_values) > 4 else 0.90
+        st.info(f"💡 **Top Layer Auto-Classified as:** `{classified_types[4] if len(classified_types) > 4 else classified_types[0]}` ($e \\approx {e_silty:.2f}$)")
 
         soil_profile = st.selectbox("Soil Profile Type", ["Parabolic (Sand / Silty Sand)", "Linear (Soft Clay)", "Constant (OC Clay)"])
         a_g = st.number_input("PGA, $a_g$ (g)", value=0.2, step=0.05)
@@ -104,11 +130,11 @@ else:
 # Dynamic Calculations
 # ---------------------------------------------------------
 K_0 = 0.46
-sigma_v0_4m = 28.0
+sigma_v0_4m = sigma_v0[4] if len(sigma_v0) > 4 else 28.0
 p_prime = ((1 + 2 * K_0) / 3) * sigma_v0_4m
 G_0 = 100 * (((3 - e_silty) ** 2) / (1 + e_silty)) * np.sqrt(p_prime / 1000.0)
 
-z_mid = H_top / 2.0
+z_mid = 4.0
 r_d = 1 - 0.01 * z_mid
 tau_max_raw = 0.65 * a_g * 68.0 * r_d
 
@@ -141,7 +167,7 @@ with tab_ex2:
     st.caption("Field Investigation Step: Direct calculation using continuous cone resistance ($q_c$) profile.")
 
     d_cone = 25.4
-    qc_tip_book = qc_values[-1]  # Bottom-most qc value
+    qc_tip_book = qc_values[-1]
     qb_qc_ratio = max(1 - 0.5 * np.log10((D_0 * 1000) / d_cone), 0.13)
     q_b_cpt = qb_qc_ratio * qc_tip_book
     Q_b_ex2 = q_b_cpt * ((np.pi / 4) * (D_0 ** 2)) * 1000
@@ -165,6 +191,16 @@ with tab_ex2:
     col_c.metric("Total Capacity ($Q_u$)", f"{Q_u_mtd:.0f} kN")
     col_d.metric("Req. Piles ($N$)", f"{N_piles_mtd:.1f}")
 
+    st.subheader("📋 Soil Classification Log per Depth")
+    summary_df = pd.DataFrame({
+        "Depth (m)": depths,
+        "qc (MPa)": qc_values,
+        "Auto-Calculated σ'v0 (kPa)": np.round(sigma_v0, 2),
+        "Classified Soil Type": classified_types,
+        "Mapped Void Ratio (e)": e_values
+    })
+    st.dataframe(summary_df, use_container_width=True)
+
 # =========================================================
 # STEP 2: BROMS STATIC METHOD
 # =========================================================
@@ -172,8 +208,9 @@ with tab_ex1:
     st.subheader("6.2.1 Preliminary Design under Static Loading (Broms 1966)")
     st.caption("Analytical Verification Step: Capacity calculation based on soil strength properties.")
 
+    H_top = 8.0
     A_b = (np.pi / 4) * (D_0 ** 2)
-    sigma_b_eff = (17 * H_top) + (19 * (L_p - H_top)) - (10 * L_p)
+    sigma_b_eff = sigma_v0[-1]
     N_q = 40  
     Q_b_ex1 = A_b * sigma_b_eff * (N_q - 1)
 
