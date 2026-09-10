@@ -1081,7 +1081,7 @@ with tab_ex8:
         ax_f.legend(loc="lower right")
         st.pyplot(fig_fos)
 
-with p_col2:
+    with p_col2:
         fig_n, ax_n = plt.subplots(figsize=(6, 5))
         ax_n.semilogx(N_required_array, L_p_array, 'o-r', markevery=10, markersize=4, linewidth=2, label="Req. Pile Group Size N")
         
