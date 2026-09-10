@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="Pile Foundation Design WorkFlow", layout="wide")
 
 st.title("🏗️ Geotechnical & Foundation Design Workflow")
-st.caption("CPT Analysis ➔ Static Capacity ➔ Dynamic Stiffness ➔ SSI ➔ Inertial Loading ➔ Kinematic Interaction ➔ Liquefaction Potential ➔ Pile Sizing ➔ liquefied ground response")
+st.caption("CPT Analysis ➔ Static Capacity ➔ Dynamic Stiffness ➔ SSI ➔ Inertial Loading ➔ Kinematic Interaction ➔ Liquefaction Potential ➔ Pile Sizing ➔ liquefied ground response ➔ Lateral Spreading Analysis on Pile Group")
 
 # ---------------------------------------------------------
 # Design Procedure Flowchart Section
@@ -261,7 +261,7 @@ f_n = v_s / (4 * H_top)
 # ---------------------------------------------------------
 # Tabs Section
 # ---------------------------------------------------------
-tab_ex2, tab_ex1, tab_ex3, tab_ex4, tab_ex5, tab_ex6, tab_ex7, tab_ex8, tab_ex9 = st.tabs([
+tab_ex2, tab_ex1, tab_ex3, tab_ex4, tab_ex5, tab_ex6, tab_ex7, tab_ex8, tab_ex9, tab_ex10 = st.tabs([
     "📊 Step 1: CPT Capacity (Ex 2)", 
     "📌 Step 2: Broms Static Capacity (Ex 1)", 
     "🌊 Step 3: Soil Stiffness (Ex 3)",
@@ -270,7 +270,8 @@ tab_ex2, tab_ex1, tab_ex3, tab_ex4, tab_ex5, tab_ex6, tab_ex7, tab_ex8, tab_ex9 
     "🔄 Step 6: Kinematic Interaction (Ex 6)",
     "🌋 Step 7: Liquefaction Potential (Ex 7)",
     "🎯 Step 8: Pile Sizing based on Liquefaction considerations (Ex 8)",
-    "🌊 Step 9: Liquefied Ground Response (Ex 9)"
+    "🌊 Step 9: Liquefied Ground Response (Ex 9),"
+    "📏 Step 10: Lateral Spreading Analysis on Pile Group (Ex 10)"
 ])
 
 # =========================================================
@@ -1336,3 +1337,153 @@ with tab_ex9:
             r"\delta_h = \frac{H}{N_{group} \cdot K_{h\_eq}} = \frac{%.2f}{%s \times %.2f} = %.3f \text{ m} \quad (%.1f \text{ mm})"
             % (H_inertial_ex9, n_piles_ex9, K_h_single_MN, delta_h_ex9, delta_h_ex9 * 1000)
         )
+
+# ==========================================
+# STEP 10: LATERAL SPREADING ANALYSIS (EX 10)
+# ==========================================
+with tab_ex10:
+    st.header("Step 10: Pile Group in Soil Subject to Lateral Spreading")
+    st.markdown("""
+    This step evaluates the foundation performance under **Lateral Spreading** on sloping ground ($3^\circ$) 
+    using the **Limiting Lateral Earth Pressure Approach** (Example 10 / Cubrinovski et al. method).
+    """)
+
+    col_in1, col_in2, col_in3 = st.columns(3)
+    with col_in1:
+        q_lat = st.number_input("Limiting Lateral Pressure, q_lat (kPa)", value=20.0)
+        slope_deg = st.number_input("Ground Slope Angle (°)", value=3.0)
+    with col_in2:
+        B_cap = st.number_input("Pile Cap Width, B (m)", value=6.0)
+        t_cap = st.number_input("Pile Cap Thickness, t (m)", value=1.5)
+    with col_in3:
+        L_eff_sp = st.number_input("Effective Pile Length above Fixity, L (m)", value=11.83)
+        H_peak = st.number_input("Peak Inertial Force from Structure, H (kN)", value=1690.0)
+
+    f_delta = st.number_input("Displacement Magnification Factor, f_Δ", value=7.2)
+    f_pl = 0.0695 # Soil pressure moment factor
+
+    st.subheader("1. Design Cases Comparison & Mitigation Options")
+    
+    # Calculation Function for Displacement and Yield
+    def calc_lateral_spreading(N_piles, D_p, EI_val, My_val, H_force):
+        # Force on pile cap
+        F_cap = q_lat * B_cap * t_cap # kN
+        p_L = q_lat * D_p # kN/m
+        P_axial = V_total / N_piles # kN per pile
+        
+        # μ = sqrt(P / EI)
+        mu = np.sqrt(P_axial / EI_val)
+        mu_L = mu * L_eff_sp
+        
+        # Lateral displacement Eq 6.78:
+        # delta_h = [2*(F_cap + H) + N*p_L*D_0*L] * L / [2 * N * P * (2*f_delta - 1)]
+        num = (2 * (F_cap + H_force) + N_piles * p_L * D_p * L_eff_sp) * L_eff_sp
+        den = 2 * N_piles * P_axial * (2 * f_delta - 1)
+        delta_h = num / den # in meters
+        
+        # Yield displacement Eq 6.84: My = P * delta_yield * f_delta + (p_L * D_0 / mu^2) * f_pl
+        # delta_yield = [My - (p_L * D_p / mu^2) * f_pl] / (P * f_delta)
+        delta_yield = (My_val - (p_L * D_p / (mu**2)) * f_pl) / (P_axial * f_delta)
+        
+        return F_cap, p_L, P_axial, delta_h, delta_yield
+
+    # Case 1: Original 2x2 (N=4, D=0.75m)
+    EI_075 = 398000.0 # kN.m2
+    My_075 = 1800.0   # kNm
+    
+    # Case 2: Method 2 - Increase Pile Count (3x3, N=9, D=0.75m)
+    # Case 3: Method 3 - Increase Pile Size (2x2, N=4, D=1.00m)
+    EI_100 = 1257000.0 # kN.m2
+    My_100 = 4260.0    # kNm
+
+    # Calculate for Case 1 (Residual & Peak)
+    _, _, P1, d_res1, d_y1 = calc_lateral_spreading(4, 0.75, EI_075, My_075, 0.0)
+    _, _, _, d_peak1, _ = calc_lateral_spreading(4, 0.75, EI_075, My_075, H_peak)
+
+    # Calculate for Case 2
+    _, _, P2, d_res2, d_y2 = calc_lateral_spreading(9, 0.75, EI_075, My_075, 0.0)
+    _, _, _, d_peak2, _ = calc_lateral_spreading(9, 0.75, EI_075, My_075, H_peak)
+
+    # Calculate for Case 3
+    _, _, P3, d_res3, d_y3 = calc_lateral_spreading(4, 1.00, EI_100, My_100, 0.0)
+    _, _, _, d_peak3, _ = calc_lateral_spreading(4, 1.00, EI_100, My_100, H_peak)
+
+    # Steel volume calculation (rough estimate for L_pile)
+    vol_steel_1 = 4 * np.pi * (0.75 * 0.016 - 0.016**2) * L_pile
+    vol_steel_2 = 9 * np.pi * (0.75 * 0.016 - 0.016**2) * L_pile
+    vol_steel_3 = 4 * np.pi * (1.00 * 0.016 - 0.016**2) * L_pile
+
+    # Construct Table 6.5
+    summary_data = {
+        "Metric": [
+            "Group Configuration",
+            "Number of Piles (N)",
+            "Pile Diameter, D₀ (m)",
+            "Axial Load / Pile (kN)",
+            "Residual Disp. δ_res (mm)",
+            "Peak Disp. δ_h (mm)",
+            "Yield Disp. δ_yield (mm)",
+            "Ratio (δ_h / δ_yield)",
+            "Steel Volume (m³)",
+            "Pile Cap Size (m)",
+            "Design Status"
+        ],
+        "Design Ex. 9 (Original)": [
+            "2 × 2", "4", "0.75", f"{P1:.0f}",
+            f"{d_res1*1000:.1f}", f"{d_peak1*1000:.1f}", f"{d_y1*1000:.1f}",
+            f"{d_peak1/d_y1:.2f}", f"{vol_steel_1:.2f}", "6.00",
+            "❌ Unsuitable (Yields in spreading soil)"
+        ],
+        "Method 2 (More Piles)": [
+            "3 × 3", "9", "0.75", f"{P2:.0f}",
+            f"{d_res2*1000:.1f}", f"{d_peak2*1000:.1f}", f"{d_y2*1000:.1f}",
+            f"{d_peak2/d_y2:.2f}", f"{vol_steel_2:.2f}", "9.75",
+            "⚠️ Suitable, but costly"
+        ],
+        "Method 3 (Larger Piles)": [
+            "2 × 2", "4", "1.00", f"{P3:.0f}",
+            f"{d_res3*1000:.1f}", f"{d_peak3*1000:.1f}", f"{d_y3*1000:.1f}",
+            f"{d_peak3/d_y3:.2f}", f"{vol_steel_3:.2f}", "8.00",
+            "✅ Suitable & Optimal (Best performance)"
+        ]
+    }
+    
+    st.table(pd.DataFrame(summary_data))
+
+    # Parametric Plots (Fig 6.11 & 6.12)
+    st.subheader("2. Lateral Displacement vs. Number of Piles (Parametric Curves)")
+    
+    N_range = np.arange(4, 11)
+    d_h_075 = []
+    d_h_100 = []
+
+    for n in N_range:
+        _, _, _, dh_75, dy_75 = calc_lateral_spreading(n, 0.75, EI_075, My_075, H_peak)
+        _, _, _, dh_100, dy_100 = calc_lateral_spreading(n, 1.00, EI_100, My_100, H_peak)
+        d_h_075.append(dh_75 * 1000)
+        d_h_100.append(dh_100 * 1000)
+
+    fig2, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
+
+    # Fig 6.11 (D = 0.75m)
+    ax1.plot(N_range, d_h_075, 'k-o', label=r'Lateral Displacement $\delta_h$')
+    ax1.axhline(d_y1 * 1000, color='r', linestyle='--', label=r'Yield Limit $\delta_{yield}$')
+    ax1.set_xlabel("Number of Piles in Group, N")
+    ax1.set_ylabel("Lateral Displacement, δ (mm)")
+    ax1.set_title("D = 0.75m Tubular Steel Piles")
+    ax1.set_ylim(0, 250)
+    ax1.grid(True, linestyle=':')
+    ax1.legend()
+
+    # Fig 6.12 (D = 1.00m)
+    ax2.plot(N_range, d_h_100, 'k-o', label=r'Lateral Displacement $\delta_h$')
+    ax2.axhline(d_y3 * 1000, color='r', linestyle='--', label=r'Yield Limit $\delta_{yield}$')
+    ax2.set_xlabel("Number of Piles in Group, N")
+    ax2.set_ylabel("Lateral Displacement, δ (mm)")
+    ax2.set_title("D = 1.00m Tubular Steel Piles")
+    ax2.set_ylim(0, 100)
+    ax2.grid(True, linestyle=':')
+    ax2.legend()
+
+    st.pyplot(fig2)
+
