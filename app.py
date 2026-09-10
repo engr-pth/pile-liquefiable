@@ -1039,11 +1039,11 @@ with tab_ex8:
     fos_bearing_array = []
     for ru in r_u_base_array:
         if ru >= 1.0:
-            fos_b = 99.0
+            fos_b = 15.0  # Allow higher FOS for shallow liquefaction depth
         else:
             denom = alpha_ult * ((1.0 - ru) ** exp_bearing) - alpha_ult + 1.0
-            fos_b = 1.0 / denom if denom > 0 else 99.0
-        fos_bearing_array.append(min(fos_b, 10.0))
+            fos_b = 1.0 / denom if denom > 0 else 15.0
+        fos_bearing_array.append(fos_b)
 
     # 3. FOS for Liquefaction-induced Settlement (Eq 6.70)
     fos_settlement_array = 1.0 + 5.5 * (r_u_base_array ** 3.5)
@@ -1058,8 +1058,24 @@ with tab_ex8:
     Q_u_ref = Q_u_mtd if 'Q_u_mtd' in locals() and Q_u_mtd > 0 else 5000.0
     P_axial_ref = P_axial if 'P_axial' in locals() and P_axial > 0 else 2000.0
 
-    # Minimum number of piles required N = (P_total * FOS_max) / Q_u (Eq 6.71)
-    N_required_array = (P_axial_ref * 1000.0 * fos_max_array) / Q_u_ref
+    # Calculate depth-dependent single pile capacity Qu(Lp)
+    # Skin friction reduces as Lp gets shorter
+    Q_u_base = Q_u_ref * alpha_ult
+    Q_u_skin_max = Q_u_ref * (1.0 - alpha_ult)
+    
+    Q_u_lp_array = []
+    for lp in L_p_array:
+        # Effective capacity drops inside liquefiable depth (Lp <= z_L)
+        if lp <= z_L_input:
+            qu = Q_u_base + Q_u_skin_max * (lp / 25.0) * 0.15
+        else:
+            qu = Q_u_base + Q_u_skin_max * (lp / 25.0)
+        Q_u_lp_array.append(max(qu, 100.0))
+
+    Q_u_lp_array = np.array(Q_u_lp_array)
+
+    # Minimum number of piles required N = (P_total * FOS_max) / Q_u(Lp)
+    N_required_array = (P_axial_ref * 1000.0 * fos_max_array) / Q_u_lp_array
 
     # Plots (Fig 6.9 representation)
     p_col1, p_col2 = st.columns(2)
