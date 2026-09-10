@@ -250,7 +250,7 @@ flowchart TD
     
     G -- "Seismic loads" --> H[Analyse potential designs against:<br/>• Yield/shear failure<br/>• Limiting displacement]
     H --> I[<b>Optimal design satisfying<br/>lateral & axial criteria</b>]
-
+""")
 
 # ---------------------------------------------------------
 # Tabs Section
