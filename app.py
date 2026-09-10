@@ -1348,6 +1348,7 @@ with tab_ex10:
     using the **Limiting Lateral Earth Pressure Approach** (Example 10 / Cubrinovski et al. method).
     """)
 
+    # Primary Input Parameters
     col_in1, col_in2, col_in3 = st.columns(3)
     with col_in1:
         q_lat = st.number_input("Limiting Lateral Pressure, q_lat (kPa)", value=20.0)
@@ -1360,96 +1361,174 @@ with tab_ex10:
         H_peak = st.number_input("Peak Inertial Force from Structure, H (kN)", value=1690.0)
 
     f_delta = st.number_input("Displacement Magnification Factor, f_Δ", value=7.2)
-    f_pl = 0.0695 # Soil pressure moment factor
+    f_pl = 0.0695  # Soil pressure moment factor
+    P_design_axial = 2350.0  # kN per pile (Fixed design axial load)
 
-    st.subheader("1. Design Cases Comparison & Mitigation Options")
+    st.markdown("---")
+    st.subheader("⚙️ Interactive Options for Mitigation Methods")
     
-    # Corrected Calculation Function (P_axial fixed at design axial load per pile)
-    def calc_lateral_spreading(N_piles, D_p, EI_val, My_val, H_force, P_axial_pile=2350.0):
-        F_cap_total = q_lat * B_cap * t_cap # kN (Cap force)
+    col_m2, col_m3 = st.columns(2)
+    with col_m2:
+        st.markdown("**Method 2 Options (Increase Pile Quantity):**")
+        N_m2 = st.number_input("Number of Piles for Method 2 (N_m2)", min_value=4, max_value=25, value=9, step=1)
+        grid_m2 = f"{int(np.sqrt(N_m2))} × {int(np.sqrt(N_m2))}" if np.sqrt(N_m2).is_integer() else f"{N_m2} piles"
         
-        # Share lateral cap force & inertia force among N piles
+    with col_m3:
+        st.markdown("**Method 3 Options (Increase Pile Size):**")
+        D_m3_choice = st.selectbox("Select Pile Diameter for Method 3, D₀ (m)", [1.00, 1.20, 1.50], index=0)
+        N_m3 = st.number_input("Number of Piles for Method 3 (N_m3)", min_value=4, max_value=25, value=4, step=1)
+
+    # Section Properties Mapping
+    prop_dict = {
+        0.75: {"EI": 398000.0, "My": 1800.0, "t_wall": 0.016},
+        1.00: {"EI": 1257000.0, "My": 4260.0, "t_wall": 0.016},
+        1.20: {"EI": 2200000.0, "My": 6500.0, "t_wall": 0.018},
+        1.50: {"EI": 4500000.0, "My": 11000.0, "t_wall": 0.020}
+    }
+
+    EI_075, My_075 = prop_dict[0.75]["EI"], prop_dict[0.75]["My"]
+    EI_m3, My_m3 = prop_dict[D_m3_choice]["EI"], prop_dict[D_m3_choice]["My"]
+
+    # Calculation Function
+    def calc_lateral_spreading(N_piles, D_p, EI_val, My_val, H_force, P_axial=P_design_axial):
+        F_cap_total = q_lat * B_cap * t_cap  # kN (Cap force)
         F_cap_per_pile = (F_cap_total + H_force) / N_piles
-        p_L = q_lat * D_p # kN/m
+        p_L = q_lat * D_p  # kN/m
         
         # Lateral displacement Eq 6.78
         num = (2 * F_cap_per_pile + p_L * L_eff_sp) * L_eff_sp
-        den = 2 * P_axial_pile * (2 * f_delta - 1)
-        delta_h = num / den # in meters
+        den = 2 * P_axial * (2 * f_delta - 1)
+        delta_h = num / den  # in meters
         
         # Yield displacement Eq 6.84
-        delta_yield = (My_val - (p_L * EI_val / P_axial_pile) * f_pl) / (P_axial_pile * f_delta)
+        delta_yield = (My_val - (p_L * EI_val / P_axial) * f_pl) / (P_axial * f_delta)
         
-        return F_cap_total, p_L, P_axial_pile, delta_h, delta_yield
+        return F_cap_total, p_L, P_axial, delta_h, delta_yield
 
-    # Structural Parameters
-    EI_075, My_075 = 398000.0, 1800.0  # D = 0.75m
-    EI_100, My_100 = 1257000.0, 4260.0 # D = 1.00m
-
+    # Calculation Execution
     # Case 1: Original 2x2 (N=4, D=0.75m)
-    _, _, P1, d_res1, d_y1 = calc_lateral_spreading(4, 0.75, EI_075, My_075, 0.0, 2350.0)
-    _, _, _, d_peak1, _ = calc_lateral_spreading(4, 0.75, EI_075, My_075, H_peak, 2350.0)
+    _, _, P1, d_res1, d_y1 = calc_lateral_spreading(4, 0.75, EI_075, My_075, 0.0)
+    _, _, _, d_peak1, _ = calc_lateral_spreading(4, 0.75, EI_075, My_075, H_peak)
 
-    # Case 2: Method 2 - More Piles (3x3, N=9, D=0.75m)
-    _, _, P2, d_res2, d_y2 = calc_lateral_spreading(9, 0.75, EI_075, My_075, 0.0, 2350.0)
-    _, _, _, d_peak2, _ = calc_lateral_spreading(9, 0.75, EI_075, My_075, H_peak, 2350.0)
+    # Case 2: Method 2 (Selected N_m2, D=0.75m)
+    _, _, P2, d_res2, d_y2 = calc_lateral_spreading(N_m2, 0.75, EI_075, My_075, 0.0)
+    _, _, _, d_peak2, _ = calc_lateral_spreading(N_m2, 0.75, EI_075, My_075, H_peak)
 
-    # Case 3: Method 3 - Larger Piles (2x2, N=4, D=1.00m)
-    _, _, P3, d_res3, d_y3 = calc_lateral_spreading(4, 1.00, EI_100, My_100, 0.0, 2350.0)
-    _, _, _, d_peak3, _ = calc_lateral_spreading(4, 1.00, EI_100, My_100, H_peak, 2350.0)
+    # Case 3: Method 3 (Selected N_m3, D_m3_choice)
+    _, _, P3, d_res3, d_y3 = calc_lateral_spreading(N_m3, D_m3_choice, EI_m3, My_m3, 0.0)
+    _, _, _, d_peak3, _ = calc_lateral_spreading(N_m3, D_m3_choice, EI_m3, My_m3, H_peak)
 
+    # Steel Volume Estimates
     L_p_val = 20.0
     vol_steel_1 = 4 * np.pi * (0.75 * 0.016 - 0.016**2) * L_p_val
-    vol_steel_2 = 9 * np.pi * (0.75 * 0.016 - 0.016**2) * L_p_val
-    vol_steel_3 = 4 * np.pi * (1.00 * 0.016 - 0.016**2) * L_p_val
+    vol_steel_2 = N_m2 * np.pi * (0.75 * 0.016 - 0.016**2) * L_p_val
+    t_m3 = prop_dict[D_m3_choice]["t_wall"]
+    vol_steel_3 = N_m3 * np.pi * (D_m3_choice * t_m3 - t_m3**2) * L_p_val
 
-    # Table 6.5 Summary Data
+    st.markdown("---")
+    st.subheader("1. Design Cases Comparison Summary")
+
+    # Status Logic
+    status_m2 = "✅ Suitable" if (d_peak2 / d_y2) <= 1.0 else "⚠️ Exceeds Yield (Needs higher N)"
+    status_m3 = "✅ Suitable & Optimal" if (d_peak3 / d_y3) <= 1.0 else "⚠️ Exceeds Yield (Needs larger D or N)"
+
     summary_data = {
         "Metric": [
             "Group Configuration", "Number of Piles (N)", "Pile Diameter, D₀ (m)",
             "Axial Load / Pile (kN)", "Residual Disp. δ_res (mm)", "Peak Disp. δ_h (mm)",
             "Yield Disp. δ_yield (mm)", "Ratio (δ_h / δ_yield)", "Steel Volume (m³)",
-            "Pile Cap Size (m)", "Design Status"
+            "Design Status"
         ],
         "Design Ex. 9 (Original)": [
             "2 × 2", "4", "0.75", f"{P1:.0f}",
             f"{d_res1*1000:.1f}", f"{d_peak1*1000:.1f}", f"{d_y1*1000:.1f}",
-            f"{d_peak1/d_y1:.2f}", f"{vol_steel_1:.2f}", "6.00",
+            f"{d_peak1/d_y1:.2f}", f"{vol_steel_1:.2f}",
             "❌ Unsuitable (Yields in spreading soil)"
         ],
-        "Method 2 (More Piles)": [
-            "3 × 3", "9", "0.75", f"{P2:.0f}",
+        f"Method 2 (N={N_m2})": [
+            grid_m2, f"{N_m2}", "0.75", f"{P2:.0f}",
             f"{d_res2*1000:.1f}", f"{d_peak2*1000:.1f}", f"{d_y2*1000:.1f}",
-            f"{d_peak2/d_y2:.2f}", f"{vol_steel_2:.2f}", "9.75",
-            "⚠️ Suitable, but costly"
+            f"{d_peak2/d_y2:.2f}", f"{vol_steel_2:.2f}",
+            status_m2
         ],
-        "Method 3 (Larger Piles)": [
-            "2 × 2", "4", "1.00", f"{P3:.0f}",
+        f"Method 3 (D={D_m3_choice:.2f}m)": [
+            f"{N_m3} piles", f"{N_m3}", f"{D_m3_choice:.2f}", f"{P3:.0f}",
             f"{d_res3*1000:.1f}", f"{d_peak3*1000:.1f}", f"{d_y3*1000:.1f}",
-            f"{d_peak3/d_y3:.2f}", f"{vol_steel_3:.2f}", "8.00",
-            "✅ Suitable & Optimal (Best performance)"
+            f"{d_peak3/d_y3:.2f}", f"{vol_steel_3:.2f}",
+            status_m3
         ]
     }
     
     st.table(pd.DataFrame(summary_data))
 
-    # Parametric Plots (Fig 6.11 & 6.12)
+    # ==========================================
+    # STEP-BY-STEP CALCULATION DETAILS (EXPANDER)
+    # ==========================================
+    with st.expander("📖 Step-by-Step Calculation Details (Formulas & Intermediate Values)"):
+        st.markdown("### Governing Equations (Cubrinovski et al. Method)")
+        
+        st.latex(r"1.\quad F_{\text{cap}} = q_{\text{lat}} \cdot B_{\text{cap}} \cdot t_{\text{cap}}")
+        st.latex(r"2.\quad p_L = q_{\text{lat}} \cdot D_0")
+        st.latex(r"3.\quad F_{G, \text{pile}} = \frac{F_{\text{cap}} + H}{N}")
+        st.latex(r"4.\quad \delta_h = \frac{\left(2 \cdot F_{G, \text{pile}} + p_L \cdot L\right) \cdot L}{2 \cdot P \cdot (2 f_\Delta - 1)}")
+        st.latex(r"5.\quad \delta_{\text{yield}} = \frac{M_y - \left(\frac{p_L \cdot E I}{P}\right) \cdot f_{pL}}{P \cdot f_\Delta}")
+
+        st.markdown("---")
+        st.markdown("### Intermediate Calculations for Current Options")
+        
+        # Intermediate calculations for Method 2
+        F_cap_val = q_lat * B_cap * t_cap
+        pL_m2 = q_lat * 0.75
+        FG_m2 = (F_cap_val + H_peak) / N_m2
+        num_m2 = (2 * FG_m2 + pL_m2 * L_eff_sp) * L_eff_sp
+        den_m2 = 2 * P_design_axial * (2 * f_delta - 1)
+
+        # Intermediate calculations for Method 3
+        pL_m3 = q_lat * D_m3_choice
+        FG_m3 = (F_cap_val + H_peak) / N_m3
+        num_m3 = (2 * FG_m3 + pL_m3 * L_eff_sp) * L_eff_sp
+        den_m3 = 2 * P_design_axial * (2 * f_delta - 1)
+
+        col_calc1, col_calc2 = st.columns(2)
+        
+        with col_calc1:
+            st.markdown(f"**Method 2 ($N = {N_m2}, D = 0.75\text{{m}}$):**")
+            st.write(f"- Pile Cap Force ($F_{{\\text{{cap}}}}$): `{F_cap_val:.1f} kN`")
+            st.write(f"- Soil Resistance ($p_L$): `{pL_m2:.1f} kN/m`")
+            st.write(f"- Lateral Load per Pile ($F_{{G}}$): `{FG_m2:.2f} kN`")
+            st.write(f"- Numerator Value: `{num_m2:.2f} kNm²`")
+            st.write(f"- Denominator Value: `{den_m2:.1f} kN`")
+            st.write(f"- **Calculated $\delta_h$**: `{d_peak2*1000:.1f} mm`")
+            st.write(f"- **Calculated $\delta_{{\\text{{yield}}}}$**: `{d_y2*1000:.1f} mm`")
+
+        with col_calc2:
+            st.markdown(f"**Method 3 ($N = {N_m3}, D = {D_m3_choice:.2f}\text{{m}}$):**")
+            st.write(f"- Bending Stiffness ($EI$): `{EI_m3/1e3:.0f} × 10³ kNm²`")
+            st.write(f"- Yield Moment ($M_y$): `{My_m3:.0f} kNm`")
+            st.write(f"- Soil Resistance ($p_L$): `{pL_m3:.1f} kN/m`")
+            st.write(f"- Lateral Load per Pile ($F_{{G}}$): `{FG_m3:.2f} kN`")
+            st.write(f"- **Calculated $\delta_h$**: `{d_peak3*1000:.1f} mm`")
+            st.write(f"- **Calculated $\delta_{{\\text{{yield}}}}$**: `{d_y3*1000:.1f} mm`")
+
+    # Parametric Plots
+    st.markdown("---")
     st.subheader("2. Lateral Displacement vs. Number of Piles (Parametric Curves)")
     
     N_range = np.arange(4, 11)
-    d_h_075, d_h_100 = [], []
+    d_h_075, d_h_m3 = [], []
 
     for n in N_range:
-        _, _, _, dh_75, _ = calc_lateral_spreading(n, 0.75, EI_075, My_075, H_peak, 2350.0)
-        _, _, _, dh_100, _ = calc_lateral_spreading(n, 1.00, EI_100, My_100, H_peak, 2350.0)
+        _, _, _, dh_75, _ = calc_lateral_spreading(n, 0.75, EI_075, My_075, H_peak)
+        _, _, _, dh_m3_val, _ = calc_lateral_spreading(n, D_m3_choice, EI_m3, My_m3, H_peak)
         d_h_075.append(dh_75 * 1000)
-        d_h_100.append(dh_100 * 1000)
+        d_h_m3.append(dh_m3_val * 1000)
 
     fig2, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
 
     # Fig 6.11 (D = 0.75m)
     ax1.plot(N_range, d_h_075, 'k-o', label=r'Lateral Displacement $\delta_h$')
     ax1.axhline(d_y1 * 1000, color='r', linestyle='--', label=r'Yield Limit $\delta_{yield}$')
+    ax1.scatter([N_m2], [d_peak2 * 1000], color='blue', s=100, zorder=5, label=f'Selected N={N_m2}')
     ax1.set_xlabel("Number of Piles in Group, N")
     ax1.set_ylabel("Lateral Displacement, δ (mm)")
     ax1.set_title("D = 0.75m Tubular Steel Piles")
@@ -1457,12 +1536,13 @@ with tab_ex10:
     ax1.grid(True, linestyle=':')
     ax1.legend()
 
-    # Fig 6.12 (D = 1.00m)
-    ax2.plot(N_range, d_h_100, 'k-o', label=r'Lateral Displacement $\delta_h$')
+    # Fig 6.12 (D = D_m3_choice)
+    ax2.plot(N_range, d_h_m3, 'k-o', label=r'Lateral Displacement $\delta_h$')
     ax2.axhline(d_y3 * 1000, color='r', linestyle='--', label=r'Yield Limit $\delta_{yield}$')
+    ax2.scatter([N_m3], [d_peak3 * 1000], color='green', s=100, zorder=5, label=f'Selected N={N_m3}')
     ax2.set_xlabel("Number of Piles in Group, N")
     ax2.set_ylabel("Lateral Displacement, δ (mm)")
-    ax2.set_title("D = 1.00m Tubular Steel Piles")
+    ax2.set_title(f"D = {D_m3_choice:.2f}m Tubular Steel Piles")
     ax2.set_ylim(0, 100)
     ax2.grid(True, linestyle=':')
     ax2.legend()
