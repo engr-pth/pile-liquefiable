@@ -1364,27 +1364,25 @@ with tab_ex10:
 
     st.subheader("1. Design Cases Comparison & Mitigation Options")
     
-    # Corrected Calculation Function for Displacement and Yield
+    # Corrected Calculation Function (P_axial fixed at design axial load per pile)
     def calc_lateral_spreading(N_piles, D_p, EI_val, My_val, H_force, P_axial_pile=2350.0):
-        F_cap_total = q_lat * B_cap * t_cap # Total Force on Cap (kN)
+        F_cap_total = q_lat * B_cap * t_cap # kN (Cap force)
         
-        # Share lateral cap force among N piles
+        # Share lateral cap force & inertia force among N piles
         F_cap_per_pile = (F_cap_total + H_force) / N_piles
         p_L = q_lat * D_p # kN/m
         
-        mu = np.sqrt(P_axial_pile / EI_val)
-        
-        # Lateral displacement Eq 6.78 (Corrected):
+        # Lateral displacement Eq 6.78
         num = (2 * F_cap_per_pile + p_L * L_eff_sp) * L_eff_sp
         den = 2 * P_axial_pile * (2 * f_delta - 1)
         delta_h = num / den # in meters
         
-        # Yield displacement Eq 6.84:
-        delta_yield = (My_val - (p_L / (mu**2)) * f_pl) / (P_axial_pile * f_delta)
+        # Yield displacement Eq 6.84
+        delta_yield = (My_val - (p_L * EI_val / P_axial_pile) * f_pl) / (P_axial_pile * f_delta)
         
         return F_cap_total, p_L, P_axial_pile, delta_h, delta_yield
 
-    # Structural Properties
+    # Structural Parameters
     EI_075, My_075 = 398000.0, 1800.0  # D = 0.75m
     EI_100, My_100 = 1257000.0, 4260.0 # D = 1.00m
 
@@ -1393,8 +1391,8 @@ with tab_ex10:
     _, _, _, d_peak1, _ = calc_lateral_spreading(4, 0.75, EI_075, My_075, H_peak, 2350.0)
 
     # Case 2: Method 2 - More Piles (3x3, N=9, D=0.75m)
-    _, _, P2, d_res2, d_y2 = calc_lateral_spreading(9, 0.75, EI_075, My_075, 0.0, 1044.0)
-    _, _, _, d_peak2, _ = calc_lateral_spreading(9, 0.75, EI_075, My_075, H_peak, 1044.0)
+    _, _, P2, d_res2, d_y2 = calc_lateral_spreading(9, 0.75, EI_075, My_075, 0.0, 2350.0)
+    _, _, _, d_peak2, _ = calc_lateral_spreading(9, 0.75, EI_075, My_075, H_peak, 2350.0)
 
     # Case 3: Method 3 - Larger Piles (2x2, N=4, D=1.00m)
     _, _, P3, d_res3, d_y3 = calc_lateral_spreading(4, 1.00, EI_100, My_100, 0.0, 2350.0)
@@ -1405,7 +1403,7 @@ with tab_ex10:
     vol_steel_2 = 9 * np.pi * (0.75 * 0.016 - 0.016**2) * L_p_val
     vol_steel_3 = 4 * np.pi * (1.00 * 0.016 - 0.016**2) * L_p_val
 
-    # Table 6.5
+    # Table 6.5 Summary Data
     summary_data = {
         "Metric": [
             "Group Configuration", "Number of Piles (N)", "Pile Diameter, D₀ (m)",
@@ -1434,40 +1432,4 @@ with tab_ex10:
     }
     
     st.table(pd.DataFrame(summary_data))
-
-    # Parametric Plots (Fig 6.11 & 6.12)
-    st.subheader("2. Lateral Displacement vs. Number of Piles (Parametric Curves)")
-    
-    N_range = np.arange(4, 11)
-    d_h_075, d_h_100 = [], []
-
-    for n in N_range:
-        _, _, _, dh_75, _ = calc_lateral_spreading(n, 0.75, EI_075, My_075, H_peak, 2350.0)
-        _, _, _, dh_100, _ = calc_lateral_spreading(n, 1.00, EI_100, My_100, H_peak, 2350.0)
-        d_h_075.append(dh_75 * 1000)
-        d_h_100.append(dh_100 * 1000)
-
-    fig2, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
-
-    # Fig 6.11 (D = 0.75m)
-    ax1.plot(N_range, d_h_075, 'k-o', label=r'Lateral Displacement $\delta_h$')
-    ax1.axhline(d_y1 * 1000, color='r', linestyle='--', label=r'Yield Limit $\delta_{yield}$')
-    ax1.set_xlabel("Number of Piles in Group, N")
-    ax1.set_ylabel("Lateral Displacement, δ (mm)")
-    ax1.set_title("D = 0.75m Tubular Steel Piles")
-    ax1.set_ylim(0, 250)
-    ax1.grid(True, linestyle=':')
-    ax1.legend()
-
-    # Fig 6.12 (D = 1.00m)
-    ax2.plot(N_range, d_h_100, 'k-o', label=r'Lateral Displacement $\delta_h$')
-    ax2.axhline(d_y3 * 1000, color='r', linestyle='--', label=r'Yield Limit $\delta_{yield}$')
-    ax2.set_xlabel("Number of Piles in Group, N")
-    ax2.set_ylabel("Lateral Displacement, δ (mm)")
-    ax2.set_title("D = 1.00m Tubular Steel Piles")
-    ax2.set_ylim(0, 100)
-    ax2.grid(True, linestyle=':')
-    ax2.legend()
-
-    st.pyplot(fig2)
 
