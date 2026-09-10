@@ -882,10 +882,11 @@ with tab_ex7:
 
     # Extrapolate excess pore pressure ratio (r_u) profile
     ru_list = []
-    for z, s_v0_eff, st in zip(depths, sigma_v0_eff_list, status_list):
+    ru_list = []
+    for z, s_v0_eff, status_item in zip(depths, sigma_v0_eff_list, status_list):
         if z == 0:
             ru_list.append(1.0)
-        elif z <= z_liq_max or st == "Liquefied":
+        elif z <= z_liq_max or status_item == "Liquefied":
             ru_list.append(1.0)
         else:
             ru_val = min(sig_eff_at_z_liq / s_v0_eff, 1.0) if s_v0_eff > 0 else 0.0
