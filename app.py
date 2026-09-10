@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="Pile Foundation Design WorkFlow", layout="wide")
 
 st.title("🏗️ Geotechnical & Foundation Design Workflow")
-st.caption("CPT Analysis ➔ Static Capacity ➔ Dynamic Stiffness ➔ SSI ➔ Inertial Loading ➔ Kinematic Interaction ➔ Liquefaction Potential ➔ Pile Sizing based on Liquefaction considerations")
+st.caption("CPT Analysis ➔ Static Capacity ➔ Dynamic Stiffness ➔ SSI ➔ Inertial Loading ➔ Kinematic Interaction ➔ Liquefaction Potential ➔ Pile Sizing ➔ liquefied ground response")
 
 def integrate_trapz(y, x):
     try:
@@ -1151,3 +1151,140 @@ with tab_ex8:
         * **$L_p > 12\\text{m}$:** Static FOS condition ($FOS=2$) က စိုးမိုးပြီး Liquefaction ကြောင့် axial စွမ်းဆောင်ရည် ထိခိုက်မှု မရှိတော့ပါ။
         * **$L_p > 21\\text{m}$:** Instability (Buckling/ULS) ကြောင့် Pile Length ကို $21\\text{m}$ ထက် မပိုသင့်ပါ။
         """)
+
+# =========================================================
+# STEP 9: INERTIAL RESPONSE IN LEVEL LIQUEFIED GROUND (EX 9)
+# =========================================================
+with tab_ex9:
+    st.subheader("6.4.3 Example 9: Inertial Response in Level Liquefied Ground")
+    st.caption("Assumes zero stiffness ($E_{sD} \\approx 0$) in liquefied layer and Davisson (1970) fixity depth in dense sand.")
+
+    col_s9_1, col_s9_2 = st.columns([1.1, 1.0])
+
+    with col_s9_1:
+        st.markdown("##### ⚙️ Input Parameters for Liquefied Ground")
+        
+        L_liq_default = float(z_liq_max) if 'z_liq_max' in locals() and z_liq_max > 0 else 8.0
+        L_liq = st.number_input(
+            "Liquefied Layer Thickness / Free-standing Length, $L_{p,layer1}$ (m)",
+            value=L_liq_default, step=0.5
+        )
+        
+        k_dense = st.number_input(
+            "Subgrade Modulus of Underlying Dense Layer, $k$ (kN/m³)",
+            value=9000.0, step=500.0
+        )
+
+        spec_factor_ex9 = st.number_input(
+            "Spectral Acceleration Ratio ($S_{da} / a_g$)",
+            value=0.90, step=0.05,
+            help="Eurocode 8 design spectrum value for lengthened natural period (Damping ≈ 20%)"
+        )
+
+    with col_s9_2:
+        st.markdown("##### 🏗️ System & Group Parameters (from Step 5)")
+        n_piles_ex9 = n_piles if 'n_piles' in locals() else 4
+        m_super_ex9 = m_super if 'm_super' in locals() else 940.0
+        a_g_ex9 = a_g if 'a_g' in locals() else 0.2
+
+        st.write(f"* **Number of Piles ($N_{{group}}$):** {n_piles_ex9}")
+        st.write(f"* **Superstructure Mass ($m$):** {m_super_ex9:.0f} tons")
+        st.write(f"* **Peak Ground Acceleration ($a_g$):** {a_g_ex9:.2f} g")
+
+    # Calculations
+    E_I_val = E_I if 'E_I' in locals() else (E_pile * 1e9 * I_p)
+    T_u_ex9 = ((E_I_val) / (k_dense * 1e3)) ** 0.2
+
+    # Fixity depth after Davisson (1970)
+    if L_liq < T_u_ex9:
+        L_f = 2.2 * T_u_ex9
+    else:
+        L_f = 1.8 * T_u_ex9
+
+    L_total_eff = L_liq + L_f
+    K_h_single_ex9 = (12 * E_I_val) / (L_total_eff ** 3)  # N/m
+    K_h_single_MN = K_h_single_ex9 / 1e6                  # MN/m
+
+    K_h_group_ex9 = n_piles_ex9 * K_h_single_ex9           # N/m
+    mass_kg_ex9 = m_super_ex9 * 1000.0
+
+    f_p_ex9 = (1.0 / (2 * np.pi)) * np.sqrt(K_h_group_ex9 / mass_kg_ex9)
+    T_p_ex9 = 1.0 / f_p_ex9 if f_p_ex9 > 0 else 0.0
+
+    a_resp_ex9 = spec_factor_ex9 * a_g_ex9 * 9.81         # m/s²
+    H_inertial_ex9 = (mass_kg_ex9 * a_resp_ex9) / 1e6     # MN
+    delta_h_ex9 = H_inertial_ex9 / (K_h_group_ex9 / 1e6)  # m
+
+    st.markdown("---")
+    st.markdown("##### 📊 Calculation Results Summary")
+
+    r9_1, r9_2, r9_3, r9_4 = st.columns(4)
+    r9_1.metric("Characteristic Length ($T_u$)", f"{T_u_ex9:.2f} m")
+    r9_2.metric("Fixity Depth ($L_f$)", f"{L_f:.2f} m")
+    r9_3.metric("Single Pile Stiffness ($K_{h\_eq}$)", f"{K_h_single_MN:.2f} MN/m")
+    r9_4.metric("Natural Period ($T_p$)", f"{T_p_ex9:.2f} s")
+
+    r9_5, r9_6, r9_7, r9_8 = st.columns(4)
+    r9_5.metric("Response Acc. ($a_{resp}$)", f"{a_resp_ex9:.2f} m/s²")
+    r9_6.metric("Inertial Load ($H$)", f"{H_inertial_ex9:.2f} MN")
+    r9_7.metric("Peak Displacement ($\delta_h$)", f"{delta_h_ex9*1000:.1f} mm")
+    r9_8.metric("Equivalent Free Length", f"{L_total_eff:.2f} m")
+
+    st.markdown("---")
+    st.markdown("##### 🔄 Comparison: Non-Liquefied Ground (Ex 5) vs. Liquefied Ground (Ex 9)")
+
+    if 'K_h_eq_single' in locals() and 'delta_h_m' in locals():
+        k_orig = K_h_eq_single / 1e6
+        disp_orig = delta_h_m * 1000.0
+        tp_orig = T_p_group
+        a_orig = a_response
+    else:
+        k_orig, disp_orig, tp_orig, a_orig = 10.0, 10.0, 0.5, 4.0
+
+    comp_df = pd.DataFrame({
+        "Response Parameter": [
+            "Single Pile Lateral Stiffness (K_h)",
+            "Foundation Natural Period (T_p)",
+            "Response Acceleration (a_resp)",
+            "Peak Horizontal Displacement (δ_h)"
+        ],
+        "Non-Liquefied Ground (Ex 5)": [
+            f"{k_orig:.2f} MN/m",
+            f"{tp_orig:.2f} s",
+            f"{a_orig:.2f} m/s²",
+            f"{disp_orig:.1f} mm"
+        ],
+        "Liquefied Ground (Ex 9)": [
+            f"{K_h_single_MN:.2f} MN/m",
+            f"{T_p_ex9:.2f} s",
+            f"{a_resp_ex9:.2f} m/s²",
+            f"{delta_h_ex9*1000:.1f} mm"
+        ],
+        "Impact of Liquefaction": [
+            "Reduces the lateral stiffness substantially",
+            "Lengthens the natural period of the foundation",
+            "Reduces acceleration at top (superstructure input)",
+            "Increases lateral response substantially"
+        ]
+    })
+    st.dataframe(comp_df, use_container_width=True)
+
+    with st.expander("📖 **Step-by-Step Calculation Details (Example 9: Inertial Response in Liquefied Ground)**", expanded=False):
+        st.write(r"#### 1. Relative Pile-Soil Stiffness in Dense Sand ($T_u$)")
+        st.latex(rf"T_u = \left( \frac{{E_p I_p}}{{k}} \right)^{{0.2}} = \left( \frac{{{E_I_val/1e6:.1f} \times 10^6}}{{{k_dense:.0f} \times 10^3}} \right)^{{0.2}} = {T_u_ex9:.2f} \text{{ m}}")
+
+        st.write(r"#### 2. Fixity Depth within Dense Layer ($L_f$) - Davisson (1970)")
+        st.write(f"* Since $L_{{liq}} = {L_liq:.1f}\\text{{m}} > T_u = {T_u_ex9:.2f}\\text{{m}}$, fixity depth is $1.8 T_u$:")
+        st.latex(rf"L_f = 1.8 T_u = 1.8 \times {T_u_ex9:.2f} = {L_f:.2f} \text{{ m}} \quad (\approx 5D_0)")
+
+        st.write(r"#### 3. Single Pile Equivalent Lateral Stiffness ($K_{h\_eq}$)")
+        st.latex(rf"K_{{h\_eq}} = \frac{{12 E_p I_p}}{{\left( L_{{p,layer1}} + L_f \right)^3}} = \frac{{12 \times {E_I_val/1e6:.1f} \times 10^6}}{{\left( {L_liq:.1f} + {L_f:.2f} \right)^3}} = {K_h_single_MN:.2f} \text{{ MN/m}}")
+
+        st.write(r"#### 4. Natural Frequency ($f_p$) and Natural Period ($T_p$)")
+        st.latex(rf"f_p = \frac{{1}}{{2\pi}} \sqrt{{\frac{{N_{{group}} \cdot K_{{h\_eq}}}{{m}}}} = \frac{{1}}{{2\pi}} \sqrt{{\frac{{{n_piles_ex9} \times {K_h_single_MN:.2f} \times 10^6}}{{{mass_kg_ex9:.0f}}}}} = {f_p_ex9:.2f} \text{{ Hz}}")
+        st.latex(rf"T_p = \frac{{1}}{{f_p}} = {T_p_ex9:.2f} \text{{ s}}")
+
+        st.write(r"#### 5. Horizontal Inertial Load ($H$) & Peak Displacement ($\delta_h$)")
+        st.latex(rf"a_{{response}} = \left( \frac{{S_{{da}}}{{a_g}} \right) \cdot a_g = {spec_factor_ex9} \times {a_g_ex9:.2f}\text{{g}} = {a_resp_ex9:.2f} \text{{ m/s}}^2")
+        st.latex(rf"H = m \cdot a_{{response}} = {m_super_ex9:.0f} \times 10^3 \times {a_resp_ex9:.2f} = {H_inertial_ex9:.2f} \text{{ MN}}")
+        st.latex(rf"\delta_h = \frac{{H}}{{N_{{group}} \cdot K_{{h\_eq}}}} = \frac{{{H_inertial_ex9:.2f}}}{{{n_piles_ex9} \times {K_h_single_MN:.2f}}} = {delta_h_ex9:.3f} \text{{ m}} \quad ({delta_h_ex9*1000:.1f} \text{{ mm}})")
