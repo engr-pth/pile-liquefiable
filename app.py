@@ -1549,7 +1549,11 @@ with tab_ex10:
     ax2.set_xlabel("Number of Piles in Group, N")
     ax2.set_ylabel("Lateral Displacement, δ (mm)")
     ax2.set_title(f"D = {D_m3_choice:.2f}m Tubular Steel Piles")
-    ax2.set_ylim(0, 100)
+
+    # Dynamic Y-axis limit (တန်ဖိုးများ ၁၀၀ ထက်ကျော်ပါက အလိုအလျောက် မြှင့်ပေးမည်)
+    max_val = max(d_y3 * 1000, max(d_h_m3))
+    ax2.set_ylim(0, max_val * 1.15)
+
     ax2.grid(True, linestyle=':')
     ax2.legend()
 
