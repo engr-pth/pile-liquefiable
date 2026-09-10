@@ -1281,7 +1281,15 @@ with tab_ex9:
         st.latex(rf"K_{{h\_eq}} = \frac{{12 E_p I_p}}{{\left( L_{{p,layer1}} + L_f \right)^3}} = \frac{{12 \times {E_I_val/1e6:.1f} \times 10^6}}{{\left( {L_liq:.1f} + {L_f:.2f} \right)^3}} = {K_h_single_MN:.2f} \text{{ MN/m}}")
 
         st.write(r"#### 4. Natural Frequency ($f_p$) and Natural Period ($T_p$)")
-        st.latex(rf"f_p = \frac{{1}}{{2\pi}} \sqrt{{\frac{{N_{{group}} \cdot K_{{h\_eq}}}{{m}}}} = \frac{{1}}{{2\pi}} \sqrt{{\frac{{{n_piles_ex9} \times {K_h_single_MN:.2f} \times 10^6}}{{{mass_kg_ex9:.0f}}}}} = {f_p_ex9:.2f} \text{{ Hz}}")
+        kh_str = f"{K_h_single_MN:.2f}"
+        mass_str = f"{mass_kg_ex9:.0f}"
+        fp_str = f"{f_p_ex9:.2f}"
+
+        st.latex(
+            rf"f_p = \frac{{1}}{{2\pi}} \sqrt{{\frac{{N_{{group}} \cdot K_{{h\_eq}}}{{m}}}} = "
+            rf"\frac{{1}}{{2\pi}} \sqrt{{\frac{{{n_piles_ex9} \times {kh_str} \times 10^6}}{{{mass_str}}}}} = "
+            rf"{fp_str} \text{{ Hz}}"
+        )
         st.latex(rf"T_p = \frac{{1}}{{f_p}} = {T_p_ex9:.2f} \text{{ s}}")
 
         st.write(r"#### 5. Horizontal Inertial Load ($H$) & Peak Displacement ($\delta_h$)")
