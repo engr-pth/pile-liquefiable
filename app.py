@@ -5,7 +5,7 @@ import pandas as pd
 st.set_page_config(page_title="Pile Foundation Design WorkFlow", layout="wide")
 
 st.title("🏗️ Geotechnical & Foundation Design Workflow")
-st.caption("CPT-Based Analysis ➔ Static Empirical Capacity ➔ Dynamic Soil Stiffness ➔ SSI & Active Length")
+st.caption("CPT-Based Analysis ➔ Static Capacity ➔ Dynamic Stiffness ➔ SSI & Active Length ➔ Inertial Loading")
 
 def integrate_trapz(y, x):
     try:
@@ -136,7 +136,6 @@ with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/
             else:
                 gamma_values.append(g_val)
 
-        # Dynamic Sigma_v0 calculation based on Effective Unit Weight
         sigma_v0 = [0.0]
         for i in range(1, len(depths)):
             dz = depths[i] - depths[i-1]
@@ -218,15 +217,16 @@ G_ratio = 1 / ((1 + (gamma_sol / gamma_r)) ** c_exponent)
 # ---------------------------------------------------------
 # Tabs Section
 # ---------------------------------------------------------
-tab_ex2, tab_ex1, tab_ex3, tab_ex4 = st.tabs([
+tab_ex2, tab_ex1, tab_ex3, tab_ex4, tab_ex5 = st.tabs([
     "📊 Step 1: CPT-Based Capacity (Ex 2)", 
     "📌 Step 2: Broms Static Capacity (Ex 1)", 
     "🌊 Step 3: Dynamic Soil Stiffness (Ex 3)",
-    "📏 Step 4: Active Length & SSI (Ex 4)"
+    "📏 Step 4: Active Length & SSI (Ex 4)",
+    "💥 Step 5: Inertial Loading (Ex 5)"
 ])
 
 # =========================================================
-# STEP 1: CPT METHOD (ICP / Jardine & Chow 1996)
+# STEP 1: CPT METHOD
 # =========================================================
 with tab_ex2:
     st.subheader(f"6.2.2 CPT-Based Axial Capacity ({pile_type})")
@@ -505,9 +505,6 @@ with tab_ex4:
         col_e7.metric("Elastic Length ($T_l$, Upper)", f"{T_l:.3f} m")
         col_e8.metric("Relative Length ($Z_u$)", f"{Z_u:.2f} ({classify_behavior(Z_u)})")
 
-    # =========================================================
-    # EXPANDER: STEP-BY-STEP CALCULATION DETAILS (OUTSIDE IF-ELSE)
-    # =========================================================
     with st.expander("📖 Step-by-Step Calculation Details (Tab 4: Active Length & Flexibility)"):
         st.markdown("### 1. Pile Flexural Rigidity ($E_p I_p$) & Diameter Correction")
         st.latex(r"I_p = \frac{\pi}{64} \left( D_0^4 - D_i^4 \right)")
@@ -562,3 +559,85 @@ with tab_ex4:
         * **$2.5 \le Z \le 5.0$:** Semi-Flexible / Intermediate Behavior.
         * **$Z < 2.5$:** Rigid Pile Behavior (Short Stubby Pile Rotation).
         """)
+
+# =========================================================
+# STEP 5: INERTIAL LOADING ON THE PILE (EUROCODE 8)
+# =========================================================
+with tab_ex5:
+    st.subheader("6.3.3 Inertial Loading on the Pile (Eurocode 8)")
+
+    st.markdown("##### ⚙️ Superstructure & Dynamic Input Parameters")
+    col_in1, col_in2, col_in3, col_in4 = st.columns(4)
+    with col_in1:
+        n_piles = st.number_input("Number of Piles in Group, $N_{group}$", value=4, step=1)
+    with col_in2:
+        m_super = st.number_input("Superstructure Mass, $m$ (tons)", value=940.0, step=10.0)
+    with col_in3:
+        h_mass = st.number_input("Height of Mass Center, $h$ (m)", value=10.0, step=0.5)
+    with col_in4:
+        spectral_acc_factor = st.number_input("Spectral Acc. Ratio ($S_{da} / a_g$)", value=2.13, step=0.01)
+
+    # 1. Stiffness Ratio (E_p / E_sD)
+    stiffness_ratio = (E_p_corrected * 1000.0) / E_sD
+
+    # 2. Eurocode 8 Stiffness Coefficients (Square Root Variation Model)
+    K_HH_single = 0.79 * D_0 * (E_sD * 1e6) * (stiffness_ratio ** 0.28)
+    K_MM_single = 0.15 * (D_0 ** 3) * (E_sD * 1e6) * (stiffness_ratio ** 0.77)
+    K_HM_single = -0.24 * (D_0 ** 2) * (E_sD * 1e6) * (stiffness_ratio ** 0.53)
+
+    # 3. Fixed-Head Condition (Rotation theta = 0 -> Denominator = 0)
+    e_eccentricity = K_HM_single / K_HH_single
+
+    # 4. Equivalent Horizontal Head Stiffness per Pile
+    K_h_eq_single = (K_HH_single * K_MM_single - K_HM_single ** 2) / (K_MM_single - e_eccentricity * K_HM_single)
+
+    # 5. Group Horizontal Frequency & Natural Period
+    K_h_group = n_piles * K_h_eq_single
+    mass_kg = m_super * 1000.0  # kg
+    f_p_group = (1.0 / (2 * np.pi)) * np.sqrt(K_h_group / mass_kg)
+    T_p_group = 1.0 / f_p_group if f_p_group > 0 else 0.0
+
+    # 6. Response Acceleration & Inertial Loads
+    a_response = spectral_acc_factor * a_g * 9.81  # m/s²
+    H_inertial_MN = (mass_kg * a_response) / 1e6    # MN
+    M_inertial_MNm = H_inertial_MN * h_mass         # MN·m
+
+    # 7. Peak Horizontal Displacement of Pile Group
+    delta_h_m = H_inertial_MN / (K_h_group / 1e6)
+
+    # Display Metrics
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Stiffness Ratio ($E_p / E_{sD}$)", f"{stiffness_ratio:.1f}")
+    m2.metric("Equivalent $K_h$ (per pile)", f"{K_h_eq_single/1e6:.1f} MN/m")
+    m3.metric("Natural Freq. ($f_p$)", f"{f_p_group:.2f} Hz")
+    m4.metric("Natural Period ($T_p$)", f"{T_p_group:.2f} s")
+
+    m5, m6, m7, m8 = st.columns(4)
+    m5.metric("Response Acc. ($a_{resp}$)", f"{a_response:.2f} m/s²")
+    m6.metric("Inertial Shear ($H$)", f"{H_inertial_MN:.2f} MN")
+    m7.metric("Inertial Moment ($M$)", f"{M_inertial_MNm:.1f} MN·m")
+    m8.metric("Peak Deflection ($\delta_h$)", f"{delta_h_m*1000:.1f} mm")
+
+    with st.expander("📖 **Step-by-Step Calculation Details (Inertial Loading & Stiffness Matrix)**", expanded=False):
+        st.write(r"#### 1. Pile-to-Soil Stiffness Ratio")
+        st.latex(rf"\left(\frac{{E_p}}{{E_{{sD}}}}\right) = \frac{{{E_p_corrected:.2f} \times 10^9}}{{{E_sD:.2f} \times 10^6}} = {stiffness_ratio:.1f}")
+
+        st.write(r"#### 2. Head Stiffness Coefficients (Eurocode 8 - Square Root Variation)")
+        st.latex(rf"K_{{HH}} = 0.79 \cdot D_0 \cdot E_{{sD}} \left(\frac{{E_p}}{{E_{{sD}}}}\right)^{{0.28}} = {K_HH_single/1e6:.1f} \text{{ MN/m}}")
+        st.latex(rf"K_{{MM}} = 0.15 \cdot D_0^3 \cdot E_{{sD}} \left(\frac{{E_p}}{{E_{{sD}}}}\right)^{{0.77}} = {K_MM_single/1e6:.1f} \text{{ MNm/rad}}")
+        st.latex(rf"K_{{HM}} = -0.24 \cdot D_0^2 \cdot E_{{sD}} \left(\frac{{E_p}}{{E_{{sD}}}}\right)^{{0.53}} = {K_HM_single/1e6:.1f} \text{{ MN}}")
+
+        st.write(r"#### 3. Eccentricity ($e$) for Rigid Pile Cap (Fixed-Head Condition)")
+        st.latex(rf"e = \frac{{K_{{HM}}}{{K_{{HH}}}} = \frac{{{K_HM_single/1e6:.1f}}}{{{K_HH_single/1e6:.1f}}} = {e_eccentricity:.2f} \text{{ m}}")
+
+        st.write(r"#### 4. Equivalent Horizontal Head Stiffness ($K_h$)")
+        st.latex(rf"K_h = \frac{{K_{{HH}} K_{{MM}} - K_{{HM}}^2}}{{K_{{MM}} - e K_{{HM}}}} = {K_h_eq_single/1e6:.1f} \text{{ MN/m}}")
+
+        st.write(r"#### 5. Pile Group Natural Frequency ($f_p$) and Response Acceleration")
+        st.latex(rf"f_p = \frac{{1}}{{2\pi}} \sqrt{{\frac{{N_{{group}} \cdot K_h}}{{m}}}} = \frac{{1}}{{2\pi}} \sqrt{{\frac{{{n_piles} \times {K_h_eq_single/1e6:.1f} \times 10^6}}{{{mass_kg:.0f}}}}} = {f_p_group:.2f} \text{{ Hz}} \quad (T_p = {T_p_group:.2f} \text{{ s}})")
+        st.latex(rf"a_{{response}} = \left(\frac{{S_{{da}}}}{{a_g}}\right) \cdot a_g = {spectral_acc_factor} \times {a_g:.2f}\text{{g}} = {a_response:.2f} \text{{ m/s}}^2")
+
+        st.write(r"#### 6. Inertial Load & Displacement Calculations")
+        st.latex(rf"H = m \cdot a_{{response}} = {m_super:.0f} \times 10^3 \times {a_response:.2f} = {H_inertial_MN:.2f} \text{{ MN}}")
+        st.latex(rf"M = H \cdot h = {H_inertial_MN:.2f} \times {h_mass:.1f} = {M_inertial_MNm:.1f} \text{{ MN}}\cdot\text{{m}}")
+        st.latex(rf"\delta_h = \frac{{H}}{{N_{{group}} \cdot K_h}} = \frac{{{H_inertial_MN:.2f}}}{{{n_piles} \times {K_h_eq_single/1e6:.1f}}} = {delta_h_m:.3f} \text{{ m}} \quad ({delta_h_m*1000:.1f} \text{{ mm}})")
