@@ -8,6 +8,31 @@ st.set_page_config(page_title="Pile Foundation Design WorkFlow", layout="wide")
 st.title("🏗️ Geotechnical & Foundation Design Workflow")
 st.caption("CPT Analysis ➔ Static Capacity ➔ Dynamic Stiffness ➔ SSI ➔ Inertial Loading ➔ Kinematic Interaction ➔ Liquefaction Potential ➔ Pile Sizing ➔ liquefied ground response")
 
+# ---------------------------------------------------------
+# Design Procedure Flowchart Section
+# ---------------------------------------------------------
+# 2. Flowchart Section (နေရာမှန်: Input Parameters မတိုင်မီ တင်ပြခြင်း)
+with st.expander("🗺️ **View Design Procedure Flowchart (Click to Expand)**", expanded=False):
+    st.markdown("""
+    ```mermaid
+    flowchart TD
+        A[CPT data / Structural design forces] --> B[Evaluate soil properties<br/><i>Dr, γs, σv0, σ'v0, ϕ etc.</i>]
+        B -- "Depth of full liquefaction & r_u profile" --> C[Evaluate liquefaction potential]
+        C -- "Range of designs satisfying axial criteria" --> D[Determine potential foundation designs<br/>based on axial considerations:<br/>• Static considerations<br/>• Bearing failure<br/>• Settlement limit<br/>• Instability]
+        
+        D --> E{Sloping ground?}
+        E -- Yes --> F[Evaluate extent of lateral spreading]
+        E -- No --> G[Evaluate seismic loads<br/><i>including spreading</i><br/>& soil resistances]
+        F --> G
+        
+        G -- "Seismic loads" --> H[Analyse potential designs against:<br/>• Yield/shear failure<br/>• Limiting displacement]
+        H --> I[<b>Optimal design satisfying<br/>lateral & axial criteria</b>]
+    ```
+    """)
+
+# ---------------------------------------------------------
+# Helper Functions
+# ---------------------------------------------------------
 def integrate_trapz(y, x):
     try:
         return np.trapezoid(y, x)
@@ -232,25 +257,6 @@ E_sD = 3 * G_s_D0
 H_top = 8.0
 v_s = np.sqrt((G_s_D0 * 1e6) / 1700.0)
 f_n = v_s / (4 * H_top)
-
-# ---------------------------------------------------------
-# Design Procedure Flowchart Section
-# ---------------------------------------------------------
-st.markdown("""
-```mermaid
-flowchart TD
-    A[CPT data / Structural design forces] --> B[Evaluate soil properties<br/><i>Dr, γs, σv0, σ'v0, ϕ etc.</i>]
-    B -- "Depth of full liquefaction & r_u profile" --> C[Evaluate liquefaction potential]
-    C -- "Range of designs satisfying axial criteria" --> D[Determine potential foundation designs<br/>based on axial considerations:<br/>• Static considerations<br/>• Bearing failure<br/>• Settlement limit<br/>• Instability]
-    
-    D --> E{Sloping ground?}
-    E -- Yes --> F[Evaluate extent of lateral spreading]
-    E -- No --> G[Evaluate seismic loads<br/><i>including spreading</i><br/>& soil resistances]
-    F --> G
-    
-    G -- "Seismic loads" --> H[Analyse potential designs against:<br/>• Yield/shear failure<br/>• Limiting displacement]
-    H --> I[<b>Optimal design satisfying<br/>lateral & axial criteria</b>]
-""")
 
 # ---------------------------------------------------------
 # Tabs Section
