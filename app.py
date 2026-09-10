@@ -236,7 +236,7 @@ f_n = v_s / (4 * H_top)
 # ---------------------------------------------------------
 # Tabs Section
 # ---------------------------------------------------------
-tab_ex2, tab_ex1, tab_ex3, tab_ex4, tab_ex5, tab_ex6, tab_ex7, tab_ex8 = st.tabs([
+tab_ex2, tab_ex1, tab_ex3, tab_ex4, tab_ex5, tab_ex6, tab_ex7, tab_ex8, tab_ex9 = st.tabs([
     "📊 Step 1: CPT Capacity (Ex 2)", 
     "📌 Step 2: Broms Static Capacity (Ex 1)", 
     "🌊 Step 3: Soil Stiffness (Ex 3)",
@@ -244,7 +244,8 @@ tab_ex2, tab_ex1, tab_ex3, tab_ex4, tab_ex5, tab_ex6, tab_ex7, tab_ex8 = st.tabs
     "💥 Step 5: Inertial Loading (Ex 5)",
     "🔄 Step 6: Kinematic Interaction (Ex 6)",
     "🌋 Step 7: Liquefaction Potential (Ex 7)",
-    "🎯 Step 8: Pile Sizing based on Liquefaction considerations (Ex 8)"
+    "🎯 Step 8: Pile Sizing based on Liquefaction considerations (Ex 8)",
+    "🌊 Step 9: Liquefied Ground Response (Ex 9)"
 ])
 
 # =========================================================
