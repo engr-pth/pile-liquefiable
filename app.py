@@ -1418,6 +1418,16 @@ with tab_ex10:
     _, _, P3, d_res3, d_y3 = calc_lateral_spreading(N_m3, D_m3_choice, EI_m3, My_m3, 0.0)
     _, _, _, d_peak3, _ = calc_lateral_spreading(N_m3, D_m3_choice, EI_m3, My_m3, H_peak)
 
+    # Dynamic Design Status Logic based on Table 6.5 Criteria
+    ratio_1 = d_peak1 / d_y1
+    status_1 = "❌ Unsuitable (Yields in spreading soil)" if ratio_1 > 1.0 else "✅ Suitable"
+
+    ratio_2 = d_peak2 / d_y2
+    status_2 = "⚠️ Suitable, but costly" if ratio_2 <= 1.0 else "⚠️ Exceeds Yield (Needs higher N)"
+
+    ratio_3 = d_peak3 / d_y3
+    status_3 = "✅ Suitable, & outperforms method 2 design in all areas" if ratio_3 <= 1.0 else "⚠️ Exceeds Yield (Needs larger D or N)"
+
     # Steel Volume Estimates
     L_p_val = 20.0
     vol_steel_1 = 4 * np.pi * (0.75 * 0.016 - 0.016**2) * L_p_val
@@ -1427,10 +1437,6 @@ with tab_ex10:
 
     st.markdown("---")
     st.subheader("1. Design Cases Comparison Summary")
-
-    # Status Logic
-    status_m2 = "✅ Suitable" if (d_peak2 / d_y2) <= 1.0 else "⚠️ Exceeds Yield (Needs higher N)"
-    status_m3 = "✅ Suitable & Optimal" if (d_peak3 / d_y3) <= 1.0 else "⚠️ Exceeds Yield (Needs larger D or N)"
 
     summary_data = {
         "Metric": [
@@ -1442,20 +1448,20 @@ with tab_ex10:
         "Design Ex. 9 (Original)": [
             "2 × 2", "4", "0.75", f"{P1:.0f}",
             f"{d_res1*1000:.1f}", f"{d_peak1*1000:.1f}", f"{d_y1*1000:.1f}",
-            f"{d_peak1/d_y1:.2f}", f"{vol_steel_1:.2f}",
-            "❌ Unsuitable (Yields in spreading soil)"
+            f"{ratio_1:.2f}", f"{vol_steel_1:.2f}",
+            status_1
         ],
         f"Method 2 (N={N_m2})": [
             grid_m2, f"{N_m2}", "0.75", f"{P2:.0f}",
             f"{d_res2*1000:.1f}", f"{d_peak2*1000:.1f}", f"{d_y2*1000:.1f}",
-            f"{d_peak2/d_y2:.2f}", f"{vol_steel_2:.2f}",
-            status_m2
+            f"{ratio_2:.2f}", f"{vol_steel_2:.2f}",
+            status_2
         ],
         f"Method 3 (D={D_m3_choice:.2f}m)": [
             f"{N_m3} piles", f"{N_m3}", f"{D_m3_choice:.2f}", f"{P3:.0f}",
             f"{d_res3*1000:.1f}", f"{d_peak3*1000:.1f}", f"{d_y3*1000:.1f}",
-            f"{d_peak3/d_y3:.2f}", f"{vol_steel_3:.2f}",
-            status_m3
+            f"{ratio_3:.2f}", f"{vol_steel_3:.2f}",
+            status_3
         ]
     }
     
@@ -1476,14 +1482,12 @@ with tab_ex10:
         st.markdown("---")
         st.markdown("### Intermediate Calculations for Current Options")
         
-        # Intermediate calculations for Method 2
         F_cap_val = q_lat * B_cap * t_cap
         pL_m2 = q_lat * 0.75
         FG_m2 = (F_cap_val + H_peak) / N_m2
         num_m2 = (2 * FG_m2 + pL_m2 * L_eff_sp) * L_eff_sp
         den_m2 = 2 * P_design_axial * (2 * f_delta - 1)
 
-        # Intermediate calculations for Method 3
         pL_m3 = q_lat * D_m3_choice
         FG_m3 = (F_cap_val + H_peak) / N_m3
         num_m3 = (2 * FG_m3 + pL_m3 * L_eff_sp) * L_eff_sp
@@ -1500,6 +1504,7 @@ with tab_ex10:
             st.write(f"- Denominator Value: `{den_m2:.1f} kN`")
             st.write(f"- **Calculated $\delta_h$**: `{d_peak2*1000:.1f} mm`")
             st.write(f"- **Calculated $\delta_{{\\text{{yield}}}}$**: `{d_y2*1000:.1f} mm`")
+            st.write(f"- **Ratio ($\delta_h / \delta_{{\\text{{yield}}}}$)**: `{ratio_2:.2f}`")
 
         with col_calc2:
             st.markdown(f"**Method 3 ($N = {N_m3}, D = {D_m3_choice:.2f}\text{{m}}$):**")
@@ -1509,6 +1514,7 @@ with tab_ex10:
             st.write(f"- Lateral Load per Pile ($F_{{G}}$): `{FG_m3:.2f} kN`")
             st.write(f"- **Calculated $\delta_h$**: `{d_peak3*1000:.1f} mm`")
             st.write(f"- **Calculated $\delta_{{\\text{{yield}}}}$**: `{d_y3*1000:.1f} mm`")
+            st.write(f"- **Ratio ($\delta_h / \delta_{{\\text{{yield}}}}$)**: `{ratio_3:.2f}`")
 
     # Parametric Plots
     st.markdown("---")
