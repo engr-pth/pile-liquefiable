@@ -913,13 +913,13 @@ with tab_ex7:
         ax_l1.plot(qcn_curve, crr_curve, 'k-', linewidth=2, label="CRR Boundary (CRR = CSR)")
 
         # Scatter plot for CPT soil layers
-        mask_upper = depths <= 8.0
-        mask_lower = depths > 8.0
+        mask_liq = np.array(status_list) == "Liquefied"
+        mask_non_liq = np.array(status_list) == "Non-Liquefied"
 
-        ax_l1.scatter(np.array(qcn_list)[mask_upper], np.array(csr_list)[mask_upper], 
-                      color='red', marker='o', s=50, label="Upper Layer (Silty Sand, 0-8m)")
-        ax_l1.scatter(np.array(qcn_list)[mask_lower], np.array(csr_list)[mask_lower], 
-                      color='blue', marker='^', s=50, label="Lower Layer (Dense Sand, >8m)")
+        ax_l1.scatter(np.array(qcn_list)[mask_liq], np.array(csr_list)[mask_liq], 
+                      color='red', marker='o', s=50, label="Liquefied Zone (FS < 1.0)")
+        ax_l1.scatter(np.array(qcn_list)[mask_non_liq], np.array(csr_list)[mask_non_liq], 
+                      color='blue', marker='^', s=50, label="Non-Liquefied Zone (FS ≥ 1.0)")
 
         ax_l1.text(50, 0.35, "LIQUEFIABLE", fontsize=11, fontweight='bold', color='red')
         ax_l1.text(170, 0.22, "NON-LIQUEFIABLE", fontsize=11, fontweight='bold', color='green')
