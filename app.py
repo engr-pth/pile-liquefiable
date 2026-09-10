@@ -585,7 +585,7 @@ with tab_ex5:
     K_MM_single = 0.15 * (D_0 ** 3) * (E_sD * 1e6) * (stiffness_ratio ** 0.77)
     K_HM_single = -0.24 * (D_0 ** 2) * (E_sD * 1e6) * (stiffness_ratio ** 0.53)
 
-    # 3. Fixed-Head Condition (Rotation theta = 0 -> Denominator = 0)
+    # 3. Fixed-Head Condition
     e_eccentricity = K_HM_single / K_HH_single
 
     # 4. Equivalent Horizontal Head Stiffness per Pile
@@ -620,7 +620,7 @@ with tab_ex5:
 
     with st.expander("📖 **Step-by-Step Calculation Details (Inertial Loading & Stiffness Matrix)**", expanded=False):
         st.write(r"#### 1. Pile-to-Soil Stiffness Ratio")
-        st.latex(rf"\left(\frac{{E_p}}{{E_{{sD}}}}\right) = \frac{{{E_p_corrected:.2f} \times 10^9}}{{{E_sD:.2f} \times 10^6}} = {stiffness_ratio:.1f}")
+        st.latex(rf"\frac{{E_p}}{{E_{{sD}}}} = \frac{{{E_p_corrected:.2f} \times 10^9}}{{{E_sD:.2f} \times 10^6}} = {stiffness_ratio:.1f}")
 
         st.write(r"#### 2. Head Stiffness Coefficients (Eurocode 8 - Square Root Variation)")
         st.latex(rf"K_{{HH}} = 0.79 \cdot D_0 \cdot E_{{sD}} \left(\frac{{E_p}}{{E_{{sD}}}}\right)^{{0.28}} = {K_HH_single/1e6:.1f} \text{{ MN/m}}")
@@ -628,7 +628,7 @@ with tab_ex5:
         st.latex(rf"K_{{HM}} = -0.24 \cdot D_0^2 \cdot E_{{sD}} \left(\frac{{E_p}}{{E_{{sD}}}}\right)^{{0.53}} = {K_HM_single/1e6:.1f} \text{{ MN}}")
 
         st.write(r"#### 3. Eccentricity ($e$) for Rigid Pile Cap (Fixed-Head Condition)")
-        st.latex(rf"e = \frac{{K_{{HM}}}{{K_{{HH}}}} = \frac{{{K_HM_single/1e6:.1f}}}{{{K_HH_single/1e6:.1f}}} = {e_eccentricity:.2f} \text{{ m}}")
+        st.latex(rf"e = \frac{{K_{{HM}}}}{{K_{{HH}}}} = \frac{{{K_HM_single / 1e6:.1f}}}{{{K_HH_single / 1e6:.1f}}} = {e_eccentricity:.2f} \text{{ m}}")
 
         st.write(r"#### 4. Equivalent Horizontal Head Stiffness ($K_h$)")
         st.latex(rf"K_h = \frac{{K_{{HH}} K_{{MM}} - K_{{HM}}^2}}{{K_{{MM}} - e K_{{HM}}}} = {K_h_eq_single/1e6:.1f} \text{{ MN/m}}")
