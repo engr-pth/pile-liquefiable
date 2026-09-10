@@ -1285,11 +1285,13 @@ with tab_ex9:
         mass_str = f"{mass_kg_ex9:.0f}"
         fp_str = f"{f_p_ex9:.2f}"
 
-        st.latex(
-            rf"f_p = \frac{{1}}{{2\pi}} \sqrt{{\frac{{N_{{group}} \cdot K_{{h\_eq}}}{{m}}}} = "
-            rf"\frac{{1}}{{2\pi}} \sqrt{{\frac{{{n_piles_ex9} \times {kh_str} \times 10^6}}{{{mass_str}}}}} = "
-            rf"{fp_str} \text{{ Hz}}"
+        latex_code = (
+            r"f_p = \frac{1}{2\pi} \sqrt{\frac{N_{group} \cdot K_{h\_eq}}{m}} = "
+            r"\frac{1}{2\pi} \sqrt{\frac{%s \times %s \times 10^6}{%s}} = "
+            r"%s \text{ Hz}" % (n_piles_ex9, kh_str, mass_str, fp_str)
         )
+
+        st.latex(latex_code)
         st.latex(rf"T_p = \frac{{1}}{{f_p}} = {T_p_ex9:.2f} \text{{ s}}")
 
         st.write(r"#### 5. Horizontal Inertial Load ($H$) & Peak Displacement ($\delta_h$)")
