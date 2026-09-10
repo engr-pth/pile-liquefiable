@@ -1692,10 +1692,10 @@ with tab_ex11:
         st.markdown("---")
         st.markdown("### 2. Detailed Intermediate Values")
         st.write(f"- **Crust Lateral Unit Pressure ($q_{{\\text{{crust}}}}$)**: `{q_crust:.2f} kPa`")
-        st.write(f"- **Total Crust Force on Pile Cap ($F_{{\\text{{soil}}}}$)**: `{F_soil:.1f} kN` (Exact textbook value: ~2056 kN)")
+        st.write(f"- **Total Crust Force on Pile Cap ($F_{{\\text{{soil}}}}$)**: `{F_soil:.1f} kN`")
         st.write(f"- **Soil Drag Pressure on Liquefied Section ($p_L$)**: `{p_L_ex11:.2f} kN/m`")
-        st.write(f"- **Residual Displacement ($\delta_r$)**: `{delta_res_ex11*1000:.1f} mm` (Textbook: 218 mm)")
-        st.write(f"- **Peak Transient Displacement ($\delta_h$)**: `{delta_peak_ex11*1000:.1f} mm` (Textbook: 377 mm)")
+        st.write(f"- **Residual Displacement ($\delta_r$)**: `{delta_res_ex11*1000:.1f} mm`")
+        st.write(f"- **Peak Transient Displacement ($\delta_h$)**: `{delta_peak_ex11*1000:.1f} mm`")
         st.write(f"- **Performance Ratio ($\delta_h / \delta_{{\\text{{yield}}}}$)**: `{ratio_ex11:.2f}`")
 
     # Comparison Plot
