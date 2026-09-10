@@ -656,7 +656,43 @@ with tab_ex6:
             index=0
         )
 
-        u_0_input = st.number_input("Free-Field Surface Displacement, $u_0$ (mm)", value=92.0, step=1.0)
+        u_0_input = st.number_input("Peak Free-Field Surface Displacement, $u_0$ (mm)", value=92.0, step=1.0)
+        
+        # --- STATIC GROUND DISPLACEMENT (u_g) OPTIONS ---
+        st.markdown("###### 🌐 Static Ground Displacement ($u_g$ / Bedrock PGD at $f=0$ Hz)")
+        ug_method = st.selectbox(
+            "Method to determine $u_g$",
+            [
+                "1. Direct Input (1D Site Response / DEEPSOIL / SHAKE)",
+                "2. Eurocode 8 PGD Formula (d_g = 0.025 * a_g * S * T_C * T_D)",
+                "3. NGA Attenuation / Ratio Estimation (u_g = Ratio * u_0)"
+            ],
+            index=0
+        )
+
+        if "1. Direct Input" in ug_method:
+            u_g_input = st.number_input(
+                "Static Ground Displacement, $u_g$ (mm)", 
+                value=50.0, step=1.0,
+                help="Bedrock PGD obtained from double integration of acceleration time-history motion."
+            )
+        elif "2. Eurocode 8" in ug_method:
+            col_ec1, col_ec2 = st.columns(2)
+            with col_ec1:
+                pga_g = st.number_input("PGA, $a_g$ (g)", value=0.35, step=0.05)
+                S_factor = st.number_input("Soil Factor, $S$", value=1.2, step=0.1)
+            with col_ec2:
+                T_C = st.number_input("Period $T_C$ (s)", value=0.5, step=0.05)
+                T_D = st.number_input("Period $T_D$ (s)", value=2.0, step=0.1)
+            
+            # Eurocode 8 PGD Formula (m to mm conversion)
+            u_g_calc = 0.025 * (pga_g * 9.81) * S_factor * T_C * T_D * 1000.0
+            u_g_input = st.number_input("Calculated $u_g$ (mm)", value=float(np.round(u_g_calc, 1)), disabled=True)
+        else:
+            ratio_ug = st.slider("Baseline Ratio ($u_g / u_0$)", min_value=0.3, max_value=0.8, value=0.55, step=0.05)
+            u_g_input = u_0_input * ratio_ug
+            st.info(f"Estimated Static Baseline $u_g = {u_g_input:.1f}$ mm")
+
         f_p_input = st.number_input("Pile Group Natural Frequency, $f_p$ (Hz)", value=f_p_group, step=0.1)
         f_n_input = st.number_input("Soil Layer Natural Frequency, $f_n$ (Hz)", value=f_n, step=0.1)
 
@@ -694,6 +730,8 @@ with tab_ex6:
         k_m3.metric("Free-Field Displacement ($u_0$)", f"{u_0_input:.1f} mm")
         k_m4.metric("Pile Head Displacement ($u_p$)", f"{u_p:.1f} mm")
 
+        st.metric("Static Ground Displacement ($u_g$)", f"{u_g_input:.1f} mm")
+
     st.markdown("---")
     st.subheader("📈 Parametric Response Curves")
 
@@ -717,20 +755,17 @@ with tab_ex6:
 
     with tab_plot2:
         freq_axis = np.linspace(0.01, 10.0, 300)
-        
-        # 1. Continuous & Smooth Free-Field Displacement (u0) Model
         r = freq_axis / f_n_input  # Frequency Ratio (f / f_n)
         
-        # Smooth Baseline Decay (Drops naturally from 50mm at f=0 to ~30mm at high freq)
-        u_baseline = 28.0 + 22.0 * np.exp(-0.15 * freq_axis)
+        # 1. Continuous Dynamic Spectrum Model anchored strictly at u_g at f=0 Hz
+        u_base = u_g_input * np.exp(-0.12 * freq_axis)
         
-        # Dynamic Resonance Peak around f_n (No clipping, smooth peak ~98mm)
         beta = 0.22  # Damping factor
-        resonance_amp = (r**2) / np.sqrt((1 - r**2)**2 + (2 * beta * r)**2)
-        resonance_peak = 33.0 * resonance_amp * np.exp(-0.35 * r)
+        amp_shape = (r**2) / np.sqrt((1 - r**2)**2 + (2 * beta * r)**2) * np.exp(-0.35 * r)
+        amp_peak = np.max(amp_shape) if np.max(amp_shape) > 0 else 1.0
         
-        # Complete u0 Curve
-        u0_curve = u_baseline + resonance_peak
+        # u0 curve: Starts at u_g when f=0 and dynamically reaches Peak u_0_input at f_n
+        u0_curve = u_base + (u_0_input - u_g_input) * (amp_shape / amp_peak)
 
         # 2. Kinematic Interaction Factor (I_u) Curve
         F_curve = r * (stiffness_ratio ** exp_Ep) * (L_D_ratio ** exp_LD)
@@ -740,7 +775,7 @@ with tab_ex6:
         # Pile Head Displacement Curve (u_p = I_u * u0)
         up_curve = I_u_curve * u0_curve
 
-        # 3. Plotting Setup matching Fig 6.4 Exactly
+        # 3. Dynamic Plotting Setup
         fig2, ax2 = plt.subplots(figsize=(8, 4.5))
         ax2.plot(freq_axis, u0_curve, label="$u_0$ (Free-field response)", color="black", linestyle="-", linewidth=1.2)
         ax2.plot(freq_axis, up_curve, label="$u_p$ (Pile head response)", color="navy", linewidth=2.5)
@@ -749,8 +784,9 @@ with tab_ex6:
         ax2.set_ylabel("Displacement (mm)", fontsize=11, fontweight='bold')
         ax2.set_title("Free Field and Pile Head Response due to Kinematic Interaction", fontsize=12)
         
+        max_y = max(np.max(u0_curve), np.max(up_curve)) * 1.1
         ax2.set_xlim(0, 10)
-        ax2.set_ylim(20, 105)
+        ax2.set_ylim(0, max_y)
         
         ax2.grid(True, linestyle="--", alpha=0.6)
         ax2.legend(loc="upper right")
