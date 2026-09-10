@@ -16,7 +16,7 @@ with st.expander("🗺️ **View Design Procedure Flowchart (Click to Expand)**"
     st.markdown("""
     ```mermaid
     flowchart TD
-        A[CPT data / Structural design forces] --> B[Evaluate soil properties<br/><i>Dr, γs, σv0, σ'v0, ϕ etc.</i>]
+        A[CPT data / Structural design/forces] --> B[Evaluate soil properties<br/><i>Dr, γs, σv0, σ'v0, ϕ etc.</i>]
         B -- "Depth of full liquefaction & r_u profile" --> C[Evaluate liquefaction potential]
         C -- "Range of designs satisfying axial criteria" --> D[Determine potential foundation designs<br/>based on axial considerations:<br/>• Static considerations<br/>• Bearing failure<br/>• Settlement limit<br/>• Instability]
         
