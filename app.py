@@ -1520,40 +1520,44 @@ with tab_ex10:
     st.markdown("---")
     st.subheader("2. Lateral Displacement vs. Number of Piles (Parametric Curves)")
     
+    # Method 2 အတွက် Pile Diameter Variable (Default: 0.75m)
+    D_m2_val = 0.75
+
     N_range = np.arange(4, 11)
-    d_h_075, d_h_m3 = [], []
+    d_h_m2, d_h_m3 = [], []
 
     for n in N_range:
-        _, _, _, dh_75, _ = calc_lateral_spreading(n, 0.75, EI_075, My_075, H_peak)
+        _, _, _, dh_m2_val, _ = calc_lateral_spreading(n, D_m2_val, EI_075, My_075, H_peak)
         _, _, _, dh_m3_val, _ = calc_lateral_spreading(n, D_m3_choice, EI_m3, My_m3, H_peak)
-        d_h_075.append(dh_75 * 1000)
+        d_h_m2.append(dh_m2_val * 1000)
         d_h_m3.append(dh_m3_val * 1000)
+
+    # ပုံနှစ်ခုလုံးအတွက် Max Y value ကို အတူတူယူရန် တွက်ချက်ခြင်း
+    global_y_max = max(max(d_h_m2), max(d_h_m3), d_y2 * 1000, d_y3 * 1000) * 1.15
 
     fig2, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
 
-    # Fig 6.11 (D = 0.75m)
-    ax1.plot(N_range, d_h_075, 'k-o', label=r'Lateral Displacement $\delta_h$')
-    ax1.axhline(d_y1 * 1000, color='r', linestyle='--', label=r'Yield Limit $\delta_{yield}$')
+    # Left Plot: Method 2 (Dynamic Title & Shared Y-Limit)
+    ax1.plot(N_range, d_h_m2, 'k-o', label=r'Lateral Displacement $\delta_h$')
+    ax1.axhline(d_y2 * 1000, color='r', linestyle='--', label=r'Yield Limit $\delta_{yield}$')
     ax1.scatter([N_m2], [d_peak2 * 1000], color='blue', s=100, zorder=5, label=f'Selected N={N_m2}')
     ax1.set_xlabel("Number of Piles in Group, N")
     ax1.set_ylabel("Lateral Displacement, δ (mm)")
-    ax1.set_title("D = 0.75m Tubular Steel Piles")
-    ax1.set_ylim(0, 250)
+    ax1.set_title(f"D = {D_m2_val:.2f}m Tubular Steel Piles")  # Dynamic Title
+    ax1.set_xlim(3.5, 10.5)
+    ax1.set_ylim(0, global_y_max)  # Shared Y-Axis Limit
     ax1.grid(True, linestyle=':')
     ax1.legend()
 
-    # Fig 6.12 (D = D_m3_choice)
+    # Right Plot: Method 3 (Dynamic Title & Shared Y-Limit)
     ax2.plot(N_range, d_h_m3, 'k-o', label=r'Lateral Displacement $\delta_h$')
     ax2.axhline(d_y3 * 1000, color='r', linestyle='--', label=r'Yield Limit $\delta_{yield}$')
     ax2.scatter([N_m3], [d_peak3 * 1000], color='green', s=100, zorder=5, label=f'Selected N={N_m3}')
     ax2.set_xlabel("Number of Piles in Group, N")
     ax2.set_ylabel("Lateral Displacement, δ (mm)")
-    ax2.set_title(f"D = {D_m3_choice:.2f}m Tubular Steel Piles")
-
-    # Dynamic Y-axis limit (တန်ဖိုးများ ၁၀၀ ထက်ကျော်ပါက အလိုအလျောက် မြှင့်ပေးမည်)
-    max_val = max(d_y3 * 1000, max(d_h_m3))
-    ax2.set_ylim(0, max_val * 1.15)
-
+    ax2.set_title(f"D = {D_m3_choice:.2f}m Tubular Steel Piles")  # Dynamic Title
+    ax2.set_xlim(3.5, 10.5)
+    ax2.set_ylim(0, global_y_max)  # Shared Y-Axis Limit
     ax2.grid(True, linestyle=':')
     ax2.legend()
 
