@@ -1292,9 +1292,21 @@ with tab_ex9:
         )
 
         st.latex(latex_code)
-        st.latex(rf"T_p = \frac{{1}}{{f_p}} = {T_p_ex9:.2f} \text{{ s}}")
+        st.latex(r"T_p = \frac{1}{f_p} = %.2f \text{ s}" % T_p_ex9)
 
         st.write(r"#### 5. Horizontal Inertial Load ($H$) & Peak Displacement ($\delta_h$)")
-        st.latex(rf"a_{{response}} = \left( \frac{{S_{{da}}}{{a_g}} \right) \cdot a_g = {spec_factor_ex9} \times {a_g_ex9:.2f}\text{{g}} = {a_resp_ex9:.2f} \text{{ m/s}}^2")
-        st.latex(rf"H = m \cdot a_{{response}} = {m_super_ex9:.0f} \times 10^3 \times {a_resp_ex9:.2f} = {H_inertial_ex9:.2f} \text{{ MN}}")
-        st.latex(rf"\delta_h = \frac{{H}}{{N_{{group}} \cdot K_{{h\_eq}}}} = \frac{{{H_inertial_ex9:.2f}}}{{{n_piles_ex9} \times {K_h_single_MN:.2f}}} = {delta_h_ex9:.3f} \text{{ m}} \quad ({delta_h_ex9*1000:.1f} \text{{ mm}})")
+
+        st.latex(
+            r"a_{response} = \left( \frac{S_{da}}{a_g} \right) \cdot a_g = %s \times %.2f \text{g} = %.2f \text{ m/s}^2"
+            % (spec_factor_ex9, a_g_ex9, a_resp_ex9)
+        )
+
+        st.latex(
+            r"H = m \cdot a_{response} = %.0f \times 10^3 \times %.2f = %.2f \text{ MN}"
+            % (m_super_ex9, a_resp_ex9, H_inertial_ex9)
+        )
+
+        st.latex(
+            r"\delta_h = \frac{H}{N_{group} \cdot K_{h\_eq}} = \frac{%.2f}{%s \times %.2f} = %.3f \text{ m} \quad (%.1f \text{ mm})"
+            % (H_inertial_ex9, n_piles_ex9, K_h_single_MN, delta_h_ex9, delta_h_ex9 * 1000)
+        )
