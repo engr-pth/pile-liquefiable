@@ -236,39 +236,20 @@ f_n = v_s / (4 * H_top)
 # ---------------------------------------------------------
 # Design Procedure Flowchart Section
 # ---------------------------------------------------------
-st.markdown("### Design Procedure Flowchart")
-
-st.graphviz_chart("""
-digraph design_procedure {
-    rankdir=TB;
-    node [shape=box, style="filled,rounded", fillcolor="#f8f9fa", fontname="sans-serif", fontsize=10];
-    edge [fontname="sans-serif", fontsize=9];
-
-    // Nodes
-    start [label="CPT data / Structural design forces", shape=plaintext];
-    step1 [label="Evaluate soil properties\n(Dr, γs, σv0, σ'v0, ϕ etc.)"];
-    step2 [label="Evaluate liquefaction potential"];
-    step3 [label="Determine potential foundation designs\nbased on axial considerations:\n• Static considerations\n• Bearing failure\n• Settlement limit\n• Instability"];
+st.markdown("""
+```mermaid
+flowchart TD
+    A[CPT data / Structural design forces] --> B[Evaluate soil properties<br/><i>Dr, γs, σv0, σ'v0, ϕ etc.</i>]
+    B -- "Depth of full liquefaction & r_u profile" --> C[Evaluate liquefaction potential]
+    C -- "Range of designs satisfying axial criteria" --> D[Determine potential foundation designs<br/>based on axial considerations:<br/>• Static considerations<br/>• Bearing failure<br/>• Settlement limit<br/>• Instability]
     
-    sloping [label="Sloping ground?", shape=diamond, style=filled, fillcolor="#e3f2fd"];
-    spreading [label="Evaluate extent of\nlateral spreading"];
-    seismic [label="Evaluate seismic loads\n(including spreading)\n& soil resistances"];
+    D --> E{Sloping ground?}
+    E -- Yes --> F[Evaluate extent of lateral spreading]
+    E -- No --> G[Evaluate seismic loads<br/><i>including spreading</i><br/>& soil resistances]
+    F --> G
     
-    step4 [label="Analyse potential designs against:\n• Yield/shear failure\n• Limiting displacement"];
-    end [label="Optimal design satisfying\nlateral & axial criteria", shape=plaintext];
-
-    // Edges
-    start -> step1;
-    step1 -> step2 [label=" Depth of full liquefaction & ru profile "];
-    step2 -> step3 [label=" Range of designs satisfying axial criteria "];
-    step3 -> sloping;
-    sloping -> spreading [label="Yes"];
-    sloping -> seismic [label="No"];
-    spreading -> seismic;
-    seismic -> step4 [label=" Seismic loads "];
-    step4 -> end;
-}
-""")
+    G -- "Seismic loads" --> H[Analyse potential designs against:<br/>• Yield/shear failure<br/>• Limiting displacement]
+    H --> I[<b>Optimal design satisfying<br/>lateral & axial criteria</b>]
 
 
 # ---------------------------------------------------------
