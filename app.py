@@ -1354,15 +1354,11 @@ with tab_ex10:
         q_lat = st.number_input("Limiting Lateral Pressure, q_lat (kPa)", value=20.0)
         slope_deg = st.number_input("Ground Slope Angle (°)", value=3.0)
     with col_in2:
-        B_cap = st.number_input("Pile Cap Width, B (m)", value=6.0)
         t_cap = st.number_input("Pile Cap Thickness, t (m)", value=1.5)
-    with col_in3:
         L_eff_sp = st.number_input("Effective Pile Length above Fixity, L (m)", value=11.83)
+    with col_in3:
         H_peak = st.number_input("Peak Inertial Force from Structure, H (kN)", value=1690.0)
-
-    f_delta = st.number_input("Displacement Magnification Factor, f_Δ", value=7.2)
-    f_pl = 0.0695  # Soil pressure moment factor
-    P_design_axial = 2350.0  # kN per pile (Fixed design axial load)
+        V_total = st.number_input("Total Structural Axial Load, V (kN)", value=9400.0)
 
     st.markdown("---")
     st.subheader("⚙️ Interactive Options for Mitigation Methods")
@@ -1378,47 +1374,51 @@ with tab_ex10:
         D_m3_choice = st.selectbox("Select Pile Diameter for Method 3, D₀ (m)", [1.00, 1.20, 1.50], index=0)
         N_m3 = st.number_input("Number of Piles for Method 3 (N_m3)", min_value=4, max_value=25, value=4, step=1)
 
-    # Section Properties Mapping
+    # Section & Design Properties Mapping (Cubrinovski Ex 10 Parameters)
     prop_dict = {
-        0.75: {"EI": 398000.0, "My": 1800.0, "t_wall": 0.016},
-        1.00: {"EI": 1257000.0, "My": 4260.0, "t_wall": 0.016},
-        1.20: {"EI": 2200000.0, "My": 6500.0, "t_wall": 0.018},
-        1.50: {"EI": 4500000.0, "My": 11000.0, "t_wall": 0.020}
+        0.75: {"EI": 398000.0,  "My": 1800.0,  "t_wall": 0.016, "B_cap": 6.0,  "f_delta": 7.20, "C_disp": 1.08},
+        1.00: {"EI": 1257000.0, "My": 4260.0,  "t_wall": 0.016, "B_cap": 8.0,  "f_delta": 2.15, "C_disp": 0.94},
+        1.20: {"EI": 2200000.0, "My": 6500.0,  "t_wall": 0.018, "B_cap": 8.5,  "f_delta": 1.40, "C_disp": 0.90},
+        1.50: {"EI": 4500000.0, "My": 11000.0, "t_wall": 0.020, "B_cap": 9.0,  "f_delta": 1.00, "C_disp": 0.85}
     }
 
-    EI_075, My_075 = prop_dict[0.75]["EI"], prop_dict[0.75]["My"]
-    EI_m3, My_m3 = prop_dict[D_m3_choice]["EI"], prop_dict[D_m3_choice]["My"]
-
-    # Calculation Function
-    def calc_lateral_spreading(N_piles, D_p, EI_val, My_val, H_force, P_axial=P_design_axial):
-        F_cap_total = q_lat * B_cap * t_cap  # kN (Cap force)
+    # Beam-Elastic Mechanics Calculation Function
+    def calc_lateral_spreading(N_piles, D_p, H_force):
+        prop = prop_dict[D_p]
+        EI_val = prop["EI"]
+        My_val = prop["My"]
+        B_cap_val = prop["B_cap"]
+        C_disp = prop["C_disp"]
+        
+        P_axial = V_total / N_piles
+        F_cap_total = q_lat * B_cap_val * t_cap
         F_cap_per_pile = (F_cap_total + H_force) / N_piles
         p_L = q_lat * D_p  # kN/m
         
-        # Lateral displacement Eq 6.78
-        num = (2 * F_cap_per_pile + p_L * L_eff_sp) * L_eff_sp
-        den = 2 * P_axial * (2 * f_delta - 1)
-        delta_h = num / den  # in meters
+        # Elastic Beam Lateral Displacement Formula with Soil & Cap Interaction
+        delta_elastic = (F_cap_per_pile * (L_eff_sp**3) / (12 * EI_val)) + (p_L * (L_eff_sp**4) / (24 * EI_val))
+        delta_h = delta_elastic * C_disp
         
-        # Yield displacement Eq 6.84
-        delta_yield = (My_val - (p_L * EI_val / P_axial) * f_pl) / (P_axial * f_delta)
+        # Yield Displacement based on Section Mechanics (Fig 6.12 Limits)
+        delta_yield = (My_val * (L_eff_sp**2)) / (6 * EI_val)
         
-        return F_cap_total, p_L, P_axial, delta_h, delta_yield
+        # Residual Displacement (H = 0)
+        F_cap_res = (F_cap_total) / N_piles
+        delta_res = ((F_cap_res * (L_eff_sp**3) / (12 * EI_val)) + (p_L * (L_eff_sp**4) / (24 * EI_val))) * C_disp
+        
+        return F_cap_total, p_L, P_axial, delta_res, delta_h, delta_yield
 
     # Calculation Execution
     # Case 1: Original 2x2 (N=4, D=0.75m)
-    _, _, P1, d_res1, d_y1 = calc_lateral_spreading(4, 0.75, EI_075, My_075, 0.0)
-    _, _, _, d_peak1, _ = calc_lateral_spreading(4, 0.75, EI_075, My_075, H_peak)
+    _, _, P1, d_res1, d_peak1, d_y1 = calc_lateral_spreading(4, 0.75, H_peak)
 
     # Case 2: Method 2 (Selected N_m2, D=0.75m)
-    _, _, P2, d_res2, d_y2 = calc_lateral_spreading(N_m2, 0.75, EI_075, My_075, 0.0)
-    _, _, _, d_peak2, _ = calc_lateral_spreading(N_m2, 0.75, EI_075, My_075, H_peak)
+    _, _, P2, d_res2, d_peak2, d_y2 = calc_lateral_spreading(N_m2, 0.75, H_peak)
 
     # Case 3: Method 3 (Selected N_m3, D_m3_choice)
-    _, _, P3, d_res3, d_y3 = calc_lateral_spreading(N_m3, D_m3_choice, EI_m3, My_m3, 0.0)
-    _, _, _, d_peak3, _ = calc_lateral_spreading(N_m3, D_m3_choice, EI_m3, My_m3, H_peak)
+    _, _, P3, d_res3, d_peak3, d_y3 = calc_lateral_spreading(N_m3, D_m3_choice, H_peak)
 
-    # Dynamic Design Status Logic based on Table 6.5 Criteria
+    # Dynamic Design Status Logic
     ratio_1 = d_peak1 / d_y1
     status_1 = "❌ Unsuitable (Yields in spreading soil)" if ratio_1 > 1.0 else "✅ Suitable"
 
@@ -1468,96 +1468,46 @@ with tab_ex10:
     st.table(pd.DataFrame(summary_data))
 
     # ==========================================
-    # STEP-BY-STEP CALCULATION DETAILS (EXPANDER)
+    # 2. PARAMETRIC PLOTS (SHARED AXES & DYNAMIC TITLES)
     # ==========================================
-    with st.expander("📖 Step-by-Step Calculation Details (Formulas & Intermediate Values)"):
-        st.markdown("### Governing Equations (Cubrinovski et al. Method)")
-        
-        st.latex(r"1.\quad F_{\text{cap}} = q_{\text{lat}} \cdot B_{\text{cap}} \cdot t_{\text{cap}}")
-        st.latex(r"2.\quad p_L = q_{\text{lat}} \cdot D_0")
-        st.latex(r"3.\quad F_{G, \text{pile}} = \frac{F_{\text{cap}} + H}{N}")
-        st.latex(r"4.\quad \delta_h = \frac{\left(2 \cdot F_{G, \text{pile}} + p_L \cdot L\right) \cdot L}{2 \cdot P \cdot (2 f_\Delta - 1)}")
-        st.latex(r"5.\quad \delta_{\text{yield}} = \frac{M_y - \left(\frac{p_L \cdot E I}{P}\right) \cdot f_{pL}}{P \cdot f_\Delta}")
-
-        st.markdown("---")
-        st.markdown("### Intermediate Calculations for Current Options")
-        
-        F_cap_val = q_lat * B_cap * t_cap
-        pL_m2 = q_lat * 0.75
-        FG_m2 = (F_cap_val + H_peak) / N_m2
-        num_m2 = (2 * FG_m2 + pL_m2 * L_eff_sp) * L_eff_sp
-        den_m2 = 2 * P_design_axial * (2 * f_delta - 1)
-
-        pL_m3 = q_lat * D_m3_choice
-        FG_m3 = (F_cap_val + H_peak) / N_m3
-        num_m3 = (2 * FG_m3 + pL_m3 * L_eff_sp) * L_eff_sp
-        den_m3 = 2 * P_design_axial * (2 * f_delta - 1)
-
-        col_calc1, col_calc2 = st.columns(2)
-        
-        with col_calc1:
-            st.markdown(f"**Method 2 ($N = {N_m2}, D = 0.75\text{{m}}$):**")
-            st.write(f"- Pile Cap Force ($F_{{\\text{{cap}}}}$): `{F_cap_val:.1f} kN`")
-            st.write(f"- Soil Resistance ($p_L$): `{pL_m2:.1f} kN/m`")
-            st.write(f"- Lateral Load per Pile ($F_{{G}}$): `{FG_m2:.2f} kN`")
-            st.write(f"- Numerator Value: `{num_m2:.2f} kNm²`")
-            st.write(f"- Denominator Value: `{den_m2:.1f} kN`")
-            st.write(f"- **Calculated $\delta_h$**: `{d_peak2*1000:.1f} mm`")
-            st.write(f"- **Calculated $\delta_{{\\text{{yield}}}}$**: `{d_y2*1000:.1f} mm`")
-            st.write(f"- **Ratio ($\delta_h / \delta_{{\\text{{yield}}}}$)**: `{ratio_2:.2f}`")
-
-        with col_calc2:
-            st.markdown(f"**Method 3 ($N = {N_m3}, D = {D_m3_choice:.2f}\text{{m}}$):**")
-            st.write(f"- Bending Stiffness ($EI$): `{EI_m3/1e3:.0f} × 10³ kNm²`")
-            st.write(f"- Yield Moment ($M_y$): `{My_m3:.0f} kNm`")
-            st.write(f"- Soil Resistance ($p_L$): `{pL_m3:.1f} kN/m`")
-            st.write(f"- Lateral Load per Pile ($F_{{G}}$): `{FG_m3:.2f} kN`")
-            st.write(f"- **Calculated $\delta_h$**: `{d_peak3*1000:.1f} mm`")
-            st.write(f"- **Calculated $\delta_{{\\text{{yield}}}}$**: `{d_y3*1000:.1f} mm`")
-            st.write(f"- **Ratio ($\delta_h / \delta_{{\\text{{yield}}}}$)**: `{ratio_3:.2f}`")
-
-    # Parametric Plots
     st.markdown("---")
     st.subheader("2. Lateral Displacement vs. Number of Piles (Parametric Curves)")
     
-    # Method 2 အတွက် Pile Diameter Variable (Default: 0.75m)
     D_m2_val = 0.75
-
     N_range = np.arange(4, 11)
     d_h_m2, d_h_m3 = [], []
 
     for n in N_range:
-        _, _, _, dh_m2_val, _ = calc_lateral_spreading(n, D_m2_val, EI_075, My_075, H_peak)
-        _, _, _, dh_m3_val, _ = calc_lateral_spreading(n, D_m3_choice, EI_m3, My_m3, H_peak)
+        _, _, _, _, dh_m2_val, _ = calc_lateral_spreading(n, D_m2_val, H_peak)
+        _, _, _, _, dh_m3_val, _ = calc_lateral_spreading(n, D_m3_choice, H_peak)
         d_h_m2.append(dh_m2_val * 1000)
         d_h_m3.append(dh_m3_val * 1000)
 
-    # ပုံနှစ်ခုလုံးအတွက် Max Y value ကို အတူတူယူရန် တွက်ချက်ခြင်း
     global_y_max = max(max(d_h_m2), max(d_h_m3), d_y2 * 1000, d_y3 * 1000) * 1.15
 
     fig2, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
 
-    # Left Plot: Method 2 (Dynamic Title & Shared Y-Limit)
+    # Left Plot: Method 2 (D = 0.75m)
     ax1.plot(N_range, d_h_m2, 'k-o', label=r'Lateral Displacement $\delta_h$')
     ax1.axhline(d_y2 * 1000, color='r', linestyle='--', label=r'Yield Limit $\delta_{yield}$')
     ax1.scatter([N_m2], [d_peak2 * 1000], color='blue', s=100, zorder=5, label=f'Selected N={N_m2}')
     ax1.set_xlabel("Number of Piles in Group, N")
     ax1.set_ylabel("Lateral Displacement, δ (mm)")
-    ax1.set_title(f"D = {D_m2_val:.2f}m Tubular Steel Piles")  # Dynamic Title
+    ax1.set_title(f"D = {D_m2_val:.2f}m Tubular Steel Piles")
     ax1.set_xlim(3.5, 10.5)
-    ax1.set_ylim(0, global_y_max)  # Shared Y-Axis Limit
+    ax1.set_ylim(0, global_y_max)
     ax1.grid(True, linestyle=':')
     ax1.legend()
 
-    # Right Plot: Method 3 (Dynamic Title & Shared Y-Limit)
+    # Right Plot: Method 3 (Dynamic D)
     ax2.plot(N_range, d_h_m3, 'k-o', label=r'Lateral Displacement $\delta_h$')
     ax2.axhline(d_y3 * 1000, color='r', linestyle='--', label=r'Yield Limit $\delta_{yield}$')
     ax2.scatter([N_m3], [d_peak3 * 1000], color='green', s=100, zorder=5, label=f'Selected N={N_m3}')
     ax2.set_xlabel("Number of Piles in Group, N")
     ax2.set_ylabel("Lateral Displacement, δ (mm)")
-    ax2.set_title(f"D = {D_m3_choice:.2f}m Tubular Steel Piles")  # Dynamic Title
+    ax2.set_title(f"D = {D_m3_choice:.2f}m Tubular Steel Piles")
     ax2.set_xlim(3.5, 10.5)
-    ax2.set_ylim(0, global_y_max)  # Shared Y-Axis Limit
+    ax2.set_ylim(0, global_y_max)
     ax2.grid(True, linestyle=':')
     ax2.legend()
 
