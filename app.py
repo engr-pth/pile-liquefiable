@@ -757,15 +757,21 @@ with tab_ex6:
         freq_axis = np.linspace(0.01, 10.0, 300)
         r = freq_axis / f_n_input  # Frequency Ratio (f / f_n)
         
-        # 1. Continuous Dynamic Spectrum Model anchored strictly at u_g at f=0 Hz
-        u_base = u_g_input * np.exp(-0.12 * freq_axis)
-        
+        # 1. Baseline decay & Shape Normalization
+        alpha = 0.12
+        u_base_fn = u_g_input * np.exp(-alpha * f_n_input)
+        u_base = u_g_input * np.exp(-alpha * freq_axis)
+
+        # Dynamic Spectrum Shape
         beta = 0.22  # Damping factor
         amp_shape = (r**2) / np.sqrt((1 - r**2)**2 + (2 * beta * r)**2) * np.exp(-0.35 * r)
-        amp_peak = np.max(amp_shape) if np.max(amp_shape) > 0 else 1.0
         
-        # u0 curve: Starts at u_g when f=0 and dynamically reaches Peak u_0_input at f_n
-        u0_curve = u_base + (u_0_input - u_g_input) * (amp_shape / amp_peak)
+        # Normalized Shape Factor (S = 1.0 at f = f_n)
+        amp_at_fn = (1.0 / (2 * beta)) * np.exp(-0.35)
+        S_f = amp_shape / amp_at_fn
+
+        # Exact Peak Matching u0 Curve (u0 = u_g at f=0, u0 = u_0_input at f=f_n)
+        u0_curve = u_base + (u_0_input - u_base_fn) * S_f
 
         # 2. Kinematic Interaction Factor (I_u) Curve
         F_curve = r * (stiffness_ratio ** exp_Ep) * (L_D_ratio ** exp_LD)
@@ -784,7 +790,7 @@ with tab_ex6:
         ax2.set_ylabel("Displacement (mm)", fontsize=11, fontweight='bold')
         ax2.set_title("Free Field and Pile Head Response due to Kinematic Interaction", fontsize=12)
         
-        max_y = max(np.max(u0_curve), np.max(up_curve)) * 1.1
+        max_y = max(np.max(u0_curve), np.max(up_curve)) * 1.15
         ax2.set_xlim(0, 10)
         ax2.set_ylim(0, max_y)
         
