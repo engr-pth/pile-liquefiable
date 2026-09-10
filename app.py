@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="Pile Foundation Design WorkFlow", layout="wide")
 
 st.title("🏗️ Geotechnical & Foundation Design Workflow")
-st.caption("CPT Analysis ➔ Static Capacity ➔ Dynamic Stiffness ➔ SSI ➔ Inertial Loading ➔ Kinematic Interaction")
+st.caption("CPT Analysis ➔ Static Capacity ➔ Dynamic Stiffness ➔ SSI ➔ Inertial Loading ➔ Kinematic Interaction ➔ Liquefaction Potential")
 
 def integrate_trapz(y, x):
     try:
@@ -236,13 +236,14 @@ f_n = v_s / (4 * H_top)
 # ---------------------------------------------------------
 # Tabs Section
 # ---------------------------------------------------------
-tab_ex2, tab_ex1, tab_ex3, tab_ex4, tab_ex5, tab_ex6 = st.tabs([
+tab_ex2, tab_ex1, tab_ex3, tab_ex4, tab_ex5, tab_ex6, tab_ex7 = st.tabs([
     "📊 Step 1: CPT Capacity (Ex 2)", 
     "📌 Step 2: Broms Static Capacity (Ex 1)", 
     "🌊 Step 3: Soil Stiffness (Ex 3)",
     "📏 Step 4: SSI & Active Length (Ex 4)",
     "💥 Step 5: Inertial Loading (Ex 5)",
-    "🔄 Step 6: Kinematic Interaction (Ex 6)"
+    "🔄 Step 6: Kinematic Interaction (Ex 6)",
+    "🌋 Step 7: Liquefaction Potential (Ex 7)"
 ])
 
 # =========================================================
@@ -382,8 +383,7 @@ with tab_ex3:
     nu = 0.5
     E_s = 2 * G_s * (1 + nu)  # MPa
 
-    # Shear wave velocity (v_s) calculation with proper unit conversion
-    G_s_pa = G_s * 1e6  # Convert MPa to Pa (N/m²)
+    G_s_pa = G_s * 1e6  # Convert MPa to Pa
     rho_soil = 1700.0   # kg/m³
     v_s = np.sqrt(G_s_pa / rho_soil)  # m/s
     f_n = v_s / (4 * H_top)  # Hz
@@ -658,7 +658,6 @@ with tab_ex6:
 
         u_0_input = st.number_input("Peak Free-Field Surface Displacement, $u_0$ (mm)", value=92.0, step=1.0)
         
-        # --- STATIC GROUND DISPLACEMENT (u_g) OPTIONS ---
         st.markdown("###### 🌐 Static Ground Displacement ($u_g$ / Bedrock PGD at $f=0$ Hz)")
         ug_method = st.selectbox(
             "Method to determine $u_g$",
@@ -685,7 +684,6 @@ with tab_ex6:
                 T_C = st.number_input("Period $T_C$ (s)", value=0.5, step=0.05)
                 T_D = st.number_input("Period $T_D$ (s)", value=2.0, step=0.1)
             
-            # Eurocode 8 PGD Formula (m to mm conversion)
             u_g_calc = 0.025 * (pga_g * 9.81) * S_factor * T_C * T_D * 1000.0
             u_g_input = st.number_input("Calculated $u_g$ (mm)", value=float(np.round(u_g_calc, 1)), disabled=True)
         else:
@@ -696,7 +694,6 @@ with tab_ex6:
         f_p_input = st.number_input("Pile Group Natural Frequency, $f_p$ (Hz)", value=f_p_group, step=0.1)
         f_n_input = st.number_input("Soil Layer Natural Frequency, $f_n$ (Hz)", value=f_n, step=0.1)
 
-        # Profile Exponents & Coefficients Selection (Table 2.2 Gazetas 1984)
         if profile_type == "Constant Stiffness":
             exp_Ep = 0.30
             exp_LD = -0.50
@@ -710,15 +707,14 @@ with tab_ex6:
             exp_LD = -0.40
             coeff_a, coeff_b, coeff_c = -6.75e-5, -7.0e-3, 3.3e-2
 
-        # Equations (Eq 2.15 & Eq 2.16)
         freq_ratio = f_p_input / f_n_input if f_n_input > 0 else 0.0
         L_D_ratio = L_p / D_0
 
         F_factor = freq_ratio * (stiffness_ratio ** exp_Ep) * (L_D_ratio ** exp_LD)
         I_u_calc = coeff_a * (F_factor**4) + coeff_b * (F_factor**3) + coeff_c * (F_factor**2) + 1.0
-        I_u = max(I_u_calc, 0.5)  # Gazetas limit: min I_u = 0.5
+        I_u = max(I_u_calc, 0.5)
 
-        u_p = I_u * u_0_input  # Pile Head Displacement (mm)
+        u_p = I_u * u_0_input
 
     with col_k2:
         st.markdown("##### 📊 Kinematic Interaction Results")
@@ -755,33 +751,26 @@ with tab_ex6:
 
     with tab_plot2:
         freq_axis = np.linspace(0.01, 10.0, 300)
-        r = freq_axis / f_n_input  # Frequency Ratio (f / f_n)
+        r = freq_axis / f_n_input
         
-        # 1. Baseline decay & Shape Normalization
         alpha = 0.12
         u_base_fn = u_g_input * np.exp(-alpha * f_n_input)
         u_base = u_g_input * np.exp(-alpha * freq_axis)
 
-        # Dynamic Spectrum Shape
-        beta = 0.22  # Damping factor
+        beta = 0.22
         amp_shape = (r**2) / np.sqrt((1 - r**2)**2 + (2 * beta * r)**2) * np.exp(-0.35 * r)
         
-        # Normalized Shape Factor (S = 1.0 at f = f_n)
         amp_at_fn = (1.0 / (2 * beta)) * np.exp(-0.35)
         S_f = amp_shape / amp_at_fn
 
-        # Exact Peak Matching u0 Curve (u0 = u_g at f=0, u0 = u_0_input at f=f_n)
         u0_curve = u_base + (u_0_input - u_base_fn) * S_f
 
-        # 2. Kinematic Interaction Factor (I_u) Curve
         F_curve = r * (stiffness_ratio ** exp_Ep) * (L_D_ratio ** exp_LD)
         I_u_curve = coeff_a * (F_curve**4) + coeff_b * (F_curve**3) + coeff_c * (F_curve**2) + 1.0
-        I_u_curve = np.maximum(I_u_curve, 0.5)  # Physical minimum threshold
+        I_u_curve = np.maximum(I_u_curve, 0.5)
         
-        # Pile Head Displacement Curve (u_p = I_u * u0)
         up_curve = I_u_curve * u0_curve
 
-        # 3. Dynamic Plotting Setup
         fig2, ax2 = plt.subplots(figsize=(8, 4.5))
         ax2.plot(freq_axis, u0_curve, label="$u_0$ (Free-field response)", color="black", linestyle="-", linewidth=1.2)
         ax2.plot(freq_axis, up_curve, label="$u_p$ (Pile head response)", color="navy", linewidth=2.5)
@@ -810,3 +799,185 @@ with tab_ex6:
 
         st.write(r"#### 3. Pile Head Displacement ($u_p$)")
         st.latex(rf"u_p = I_u \times u_0 = {I_u:.3f} \times {u_0_input:.1f} = {u_p:.1f} \text{{ mm}}")
+
+# =========================================================
+# STEP 7: LIQUEFACTION POTENTIAL FROM CPT DATA (EX 7)
+# =========================================================
+with tab_ex7:
+    st.subheader("6.4.1 Example 7: Determination of Liquefaction Potential from CPT Data")
+    st.caption("Seed & Idriss (1971) / Idriss & Boulanger (2004) Methodology")
+
+    # Compute Total and Effective Overburden Stress for CPT depths
+    p_a = 100.0  # Atmospheric pressure in kPa
+
+    sigma_v0_total_list = [0.0]
+    sigma_v0_eff_list = [0.0]
+
+    for i in range(1, len(depths)):
+        dz = depths[i] - depths[i-1]
+        g_tot = gamma_values[i]
+        g_eff = max(g_tot - 9.81, 1.0)
+        sigma_v0_total_list.append(sigma_v0_total_list[-1] + g_tot * dz)
+        sigma_v0_eff_list.append(sigma_v0_eff_list[-1] + g_eff * dz)
+
+    # Idriss & Boulanger MSF (Eq 6.67)
+    MSF_liq = 6.9 * np.exp(-M_w / 4.0) - 0.058
+
+    qcn_list = []
+    crr_list = []
+    csr_list = []
+    rd_list = []
+    fs_liq_list = []
+    status_list = []
+
+    for z, qc_mpA, s_v0_tot, s_v0_eff in zip(depths, qc_values, sigma_v0_total_list, sigma_v0_eff_list):
+        qc_kpa = qc_mpA * 1000.0
+        qcn = qc_kpa / p_a
+        qcn_list.append(qcn)
+
+        # CRR calculation for soils with <5% fines content (Eq 6.62)
+        if qcn > 0:
+            crr_val = np.exp((qcn / 540.0) + (qcn / 67.0)**2 - (qcn / 80.0)**3 + (qcn / 114.0)**4 - 3.0)
+        else:
+            crr_val = 0.05
+        crr_list.append(crr_val)
+
+        # rd calculation (Eqs 6.64 - 6.66)
+        if z == 0:
+            rd_val = 1.0
+        else:
+            alpha_z = -1.012 - 1.126 * np.sin((z / 11.73) + 5.133)
+            beta_z = 0.106 + 0.118 * np.sin((z / 11.28) + 5.142)
+            rd_val = np.exp(alpha_z + beta_z * M_w)
+        rd_list.append(rd_val)
+
+        # CSR calculation (Eq 6.63)
+        if z > 0 and s_v0_eff > 0:
+            csr_val = 0.65 * (a_g * s_v0_tot / s_v0_eff) * (rd_val / MSF_liq)
+        else:
+            csr_val = 0.0
+        csr_list.append(csr_val)
+
+        # Factor of Safety against Liquefaction
+        if csr_val > 0:
+            fs = crr_val / csr_val
+        else:
+            fs = 99.0
+        fs_liq_list.append(fs)
+
+        if fs < 1.0 and z > 0:
+            status_list.append("Liquefied")
+        else:
+            status_list.append("Non-Liquefied")
+
+    # Determine maximum depth of full liquefaction (ru = 1)
+    liq_depth_values = [z for z, st in zip(depths, status_list) if st == "Liquefied"]
+    z_liq_max = max(liq_depth_values) if len(liq_depth_values) > 0 else 0.0
+
+    idx_liq = np.where(depths == z_liq_max)[0]
+    if len(idx_liq) > 0 and z_liq_max > 0:
+        sig_eff_at_z_liq = sigma_v0_eff_list[idx_liq[0]]
+    else:
+        sig_eff_at_z_liq = 0.0
+
+    # Extrapolate excess pore pressure ratio (r_u) profile
+    ru_list = []
+    for z, s_v0_eff, st in zip(depths, sigma_v0_eff_list, status_list):
+        if z == 0:
+            ru_list.append(1.0)
+        elif z <= z_liq_max or st == "Liquefied":
+            ru_list.append(1.0)
+        else:
+            ru_val = min(sig_eff_at_z_liq / s_v0_eff, 1.0) if s_v0_eff > 0 else 0.0
+            ru_list.append(ru_val)
+
+    # Summary Metrics
+    l_col1, l_col2, l_col3, l_col4 = st.columns(4)
+    l_col1.metric("Earthquake Magnitude ($M_w$)", f"{M_w:.1f}")
+    l_col2.metric("PGA ($a_g$)", f"{a_g:.2f} g")
+    l_col3.metric("Magnitude Scaling Factor (MSF)", f"{MSF_liq:.3f}")
+    l_col4.metric("Depth of Full Liquefaction ($r_u = 1$)", f"{z_liq_max:.1f} m")
+
+    st.markdown("---")
+    
+    # Visual Plots
+    c_p1, c_p2 = st.columns(2)
+
+    with c_p1:
+        st.markdown("##### 📈 Liquefaction Evaluation (CSR vs q_c / p_a Curve)")
+        qcn_curve = np.linspace(10, 250, 300)
+        crr_curve = np.exp((qcn_curve / 540.0) + (qcn_curve / 67.0)**2 - (qcn_curve / 80.0)**3 + (qcn_curve / 114.0)**4 - 3.0)
+
+        fig_liq1, ax_l1 = plt.subplots(figsize=(6, 5))
+        ax_l1.plot(qcn_curve, crr_curve, 'k-', linewidth=2, label="CRR Boundary (CRR = CSR)")
+
+        # Scatter plot for CPT soil layers
+        mask_upper = depths <= 8.0
+        mask_lower = depths > 8.0
+
+        ax_l1.scatter(np.array(qcn_list)[mask_upper], np.array(csr_list)[mask_upper], 
+                      color='red', marker='o', s=50, label="Upper Layer (Silty Sand, 0-8m)")
+        ax_l1.scatter(np.array(qcn_list)[mask_lower], np.array(csr_list)[mask_lower], 
+                      color='blue', marker='^', s=50, label="Lower Layer (Dense Sand, >8m)")
+
+        ax_l1.text(50, 0.35, "LIQUEFIABLE", fontsize=11, fontweight='bold', color='red')
+        ax_l1.text(170, 0.22, "NON-LIQUEFIABLE", fontsize=11, fontweight='bold', color='green')
+
+        ax_l1.set_xlabel("Normalised Cone Resistance, $q_c / p_a$", fontsize=11)
+        ax_l1.set_ylabel("Cyclic Stress Ratio, CSR", fontsize=11)
+        ax_l1.set_xlim(0, 260)
+        ax_l1.set_ylim(0, 0.6)
+        ax_l1.grid(True, linestyle="--", alpha=0.6)
+        ax_l1.legend(loc="upper left")
+        st.pyplot(fig_liq1)
+
+    with c_p2:
+        st.markdown("##### 📉 Extrapolated Excess Pore Pressure Ratio ($r_u$) Profile")
+        fig_liq2, ax_l2 = plt.subplots(figsize=(5, 5))
+        ax_l2.plot(ru_list, depths, 'o-k', linewidth=2, markersize=5)
+        ax_l2.axhline(y=z_liq_max, color='r', linestyle='--', label=f"Full Liquefaction Depth ({z_liq_max}m)")
+        
+        ax_l2.set_xlabel("Excess Pore Pressure Ratio, $r_u$", fontsize=11)
+        ax_l2.set_ylabel("Depth (m)", fontsize=11)
+        ax_l2.set_xlim(0, 1.1)
+        ax_l2.set_ylim(max(depths), 0)  # Inverted depth axis
+        ax_l2.grid(True, linestyle="--", alpha=0.6)
+        ax_l2.legend(loc="lower left")
+        st.pyplot(fig_liq2)
+
+    st.markdown("---")
+    st.subheader("📋 Step 7 Calculation Results Table")
+    
+    liq_df = pd.DataFrame({
+        "Depth z (m)": depths,
+        "qc (MPa)": qc_values,
+        "qcn (qc/pa)": np.round(qcn_list, 1),
+        "σ_v0 Total (kPa)": np.round(sigma_v0_total_list, 1),
+        "σ'v0 Effective (kPa)": np.round(sigma_v0_eff_list, 1),
+        "rd": np.round(rd_list, 3),
+        "CSR": np.round(csr_list, 3),
+        "CRR": np.round(crr_list, 3),
+        "FS_liq": np.round(fs_liq_list, 2),
+        "Status": status_list,
+        "ru": np.round(ru_list, 3)
+    })
+    st.dataframe(liq_df, use_container_width=True)
+
+    with st.expander("📖 **Step-by-Step Calculation Details (Liquefaction Potential - Example 7)**", expanded=False):
+        st.write(r"#### 1. Cyclic Resistance Ratio (CRR)")
+        st.latex(r"CRR = \exp \left[ \frac{q_{cn}}{540} + \left(\frac{q_{cn}}{67}\right)^2 - \left(\frac{q_{cn}}{80}\right)^3 + \left(\frac{q_{cn}}{114}\right)^4 - 3 \right]")
+        st.write(f"* Normalised Cone Resistance: $q_{{cn}} = \\frac{{q_c}}{{p_a}}$ where $p_a = 100\\text{{ kPa}}$")
+
+        st.write(r"#### 2. Cyclic Stress Ratio (CSR)")
+        st.latex(r"CSR = 0.65 \left( \frac{a_{\max} \cdot \sigma_{v0}}{\sigma'_{v0}} \right) \frac{r_d}{MSF}")
+        
+        st.write(r"#### 3. Depth Reduction Factor ($r_d$) & Magnitude Scaling Factor (MSF)")
+        st.latex(r"r_d = \exp(\alpha + \beta M)")
+        st.latex(r"\alpha = -1.012 - 1.126 \sin\left(\frac{z}{11.73} + 5.133\right)")
+        st.latex(r"\beta = 0.106 + 0.118 \sin\left(\frac{z}{11.28} + 5.142\right)")
+        st.latex(rf"MSF = 6.9 \exp\left(-\frac{{M}}{{4}}\right) - 0.058 = {MSF_liq:.3f}")
+
+        st.write(r"#### 4. Excess Pore Pressure Ratio ($r_u$) Extrapolation")
+        st.write(f"* For $z \\le {z_liq_max}\\text{{ m}}$ (Liquefied Zone): $r_u = 1.0$")
+        st.write(rf"* For $z > {z_liq_max}\text{{ m}}$ (Dense Non-Liquefied Zone): Excess pore pressure is assumed constant below liquefiable boundary $\Delta u(z) = \sigma'_{{v0}}({z_liq_max}\text{{m}}) = {sig_eff_at_z_liq:.1f}\text{{ kPa}}$.")
+        st.latex(r"r_u(z) = \frac{\sigma'_{v0}(z_{\text{liq}})}{\sigma'_{v0}(z)}")
