@@ -110,7 +110,7 @@ with st.expander("⚙️ **Design Parameters & CPT Field Input (Click to Expand/
             default_cpt_df,
             column_config=column_config,
             height=250,
-            num_rows="fixed",
+            num_rows="dynamic",
             use_container_width=True
         )
         
