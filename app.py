@@ -1468,6 +1468,58 @@ with tab_ex10:
     st.table(pd.DataFrame(summary_data))
 
     # ==========================================
+    # STEP-BY-STEP CALCULATION DETAILS (EXPANDER)
+    # ==========================================
+    with st.expander("📖 Step-by-Step Calculation Details (Example 10: Lateral Spreading Analysis)"):
+        st.markdown("### 1. Governing Equations (Cubrinovski et al. Method)")
+        
+        st.latex(r"1.\quad F_{\text{cap}} = q_{\text{lat}} \cdot B_{\text{cap}} \cdot t_{\text{cap}}")
+        st.latex(r"2.\quad p_L = q_{\text{lat}} \cdot D_0")
+        st.latex(r"3.\quad F_{G, \text{pile}} = \frac{F_{\text{cap}} + H}{N}")
+        st.latex(r"4.\quad \delta_e = \frac{F_{G, \text{pile}} \cdot L^3}{12 E I} + \frac{p_L \cdot L^4}{24 E I}")
+        st.latex(r"5.\quad \delta_h = \delta_e \cdot C_{\text{disp}}")
+        st.latex(r"6.\quad \delta_{\text{yield}} = \frac{M_y \cdot L^2}{6 E I}")
+        st.latex(r"7.\quad \text{Performance Ratio} = \frac{\delta_h}{\delta_{\text{yield}}}")
+
+        st.markdown("---")
+        st.markdown("### 2. Intermediate Calculations for Current Design Cases")
+
+        # Live Intermediate Value Calculations
+        F_cap_m2 = q_lat * prop_dict[0.75]["B_cap"] * t_cap
+        pL_m2 = q_lat * 0.75
+        FG_m2 = (F_cap_m2 + H_peak) / N_m2
+
+        F_cap_m3 = q_lat * prop_dict[D_m3_choice]["B_cap"] * t_cap
+        pL_m3 = q_lat * D_m3_choice
+        FG_m3 = (F_cap_m3 + H_peak) / N_m3
+
+        col_calc1, col_calc2 = st.columns(2)
+        
+        with col_calc1:
+            st.markdown(f"**Method 2 ($N = {N_m2}, D = 0.75\text{{m}}$):**")
+            st.write(f"- Pile Cap Width ($B_{{\\text{{cap}}}}$): `{prop_dict[0.75]['B_cap']:.1f} m`")
+            st.write(f"- Pile Cap Lateral Force ($F_{{\\text{{cap}}}}$): `{F_cap_m2:.1f} kN`")
+            st.write(f"- Soil Drag Pressure ($p_L$): `{pL_m2:.1f} kN/m`")
+            st.write(f"- Total Lateral Load / Pile ($F_G$): `{FG_m2:.1f} kN`")
+            st.write(f"- Bending Stiffness ($EI$): `{prop_dict[0.75]['EI']/1e3:.0f} × 10³ kNm²`")
+            st.write(f"- Yield Moment ($M_y$): `{prop_dict[0.75]['My']:.0f} kNm`")
+            st.write(f"- **Calculated $\delta_h$**: `{d_peak2*1000:.1f} mm`")
+            st.write(f"- **Calculated $\delta_{{\\text{{yield}}}}$**: `{d_y2*1000:.1f} mm`")
+            st.write(f"- **Performance Ratio ($\delta_h / \delta_{{\\text{{yield}}}}$)**: `{ratio_2:.2f}`")
+
+        with col_calc2:
+            st.markdown(f"**Method 3 ($N = {N_m3}, D = {D_m3_choice:.2f}\text{{m}}$):**")
+            st.write(f"- Pile Cap Width ($B_{{\\text{{cap}}}}$): `{prop_dict[D_m3_choice]['B_cap']:.1f} m`")
+            st.write(f"- Pile Cap Lateral Force ($F_{{\\text{{cap}}}}$): `{F_cap_m3:.1f} kN`")
+            st.write(f"- Soil Drag Pressure ($p_L$): `{pL_m3:.1f} kN/m`")
+            st.write(f"- Total Lateral Load / Pile ($F_G$): `{FG_m3:.1f} kN`")
+            st.write(f"- Bending Stiffness ($EI$): `{prop_dict[D_m3_choice]['EI']/1e3:.0f} × 10³ kNm²`")
+            st.write(f"- Yield Moment ($M_y$): `{prop_dict[D_m3_choice]['My']:.0f} kNm`")
+            st.write(f"- **Calculated $\delta_h$**: `{d_peak3*1000:.1f} mm`")
+            st.write(f"- **Calculated $\delta_{{\\text{{yield}}}}$**: `{d_y3*1000:.1f} mm`")
+            st.write(f"- **Performance Ratio ($\delta_h / \delta_{{\\text{{yield}}}}$)**: `{ratio_3:.2f}`")
+
+    # ==========================================
     # 2. PARAMETRIC PLOTS (SHARED AXES & DYNAMIC TITLES)
     # ==========================================
     st.markdown("---")
