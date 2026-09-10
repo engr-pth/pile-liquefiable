@@ -507,6 +507,61 @@ with tab_ex4:
         col_e7.metric("Elastic Length ($T_l$, Upper)", f"{T_l:.3f} m")
         col_e8.metric("Relative Length ($Z_u$)", f"{Z_u:.2f} ({classify_behavior(Z_u)})")
 
+    with st.expander("📖 Step-by-Step Calculation Details (Tab 4: Active Length & Flexibility)"):
+        st.markdown("### 1. Pile Flexural Rigidity ($E_p I_p$) & Diameter Correction")
+        st.latex(r"I_p = \frac{\pi}{64} \left( D_0^4 - D_i^4 \right)")
+        if "Steel" in pile_type:
+            st.write(f"* **Inner Diameter ($D_i$):** $D_0 - 2t = {D_0:.3f} - 2({t_wall:.3f}) = {D_i:.3f}$ m")
+            st.write(f"* **Moment of Inertia ($I_p$):** ${I_p:.6f}$ m⁴")
+            st.latex(r"E_{p,\text{corrected}} = \frac{E_p}{\frac{D_0^4}{D_0^4 - D_i^4}}")
+            st.write(f"* **Corrected Pile Elastic Modulus ($E_{{p,corrected}}$):** ${E_p_corrected:.2f}$ GPa")
+        else:
+            st.write(f"* **Solid Pile Section ($I_p$):** ${I_p:.6f}$ m⁴")
+            st.write(f"* **Design Pile Modulus ($E_p$):** ${E_p_corrected:.2f}$ GPa")
+
+        st.markdown("---")
+        st.markdown("### 2. Operational Soil Shear Modulus ($G_{sD}$) and Young's Modulus ($E_{sD}$)")
+        st.latex(r"\sigma'_{v0} = 7.0 \times D_0")
+        st.latex(r"p' = \left(\frac{1 + 2K_0}{3}\right) \sigma'_{v0}")
+        st.latex(r"G_0 = 100 \cdot \frac{(3 - e)^2}{1 + e} \cdot \sqrt{\frac{p'}{1000}} \quad (\text{MPa})")
+        st.latex(r"G_{sD} = \left(\frac{G}{G_0}\right) \times G_0, \quad E_{sD} = 3 \times G_{sD}")
+        
+        st.write(f"* **Effective Stress at $D_0$ ($\sigma'_{{v0}}$):** ${sigma_v0_D0:.2f}$ kPa")
+        st.write(f"* **Mean Effective Stress ($p'$):** ${p_prime_D0:.2f}$ kPa")
+        st.write(f"* **Small-Strain Shear Modulus ($G_0$):** ${G_0_D0:.2f}$ MPa")
+        st.write(f"* **Degraded Shear Modulus ($G_{{sD}}$):** ${G_s_D0:.2f}$ MPa")
+        st.write(f"* **Operational Soil Modulus ($E_{{sD}}$):** ${E_sD:.2f}$ MPa")
+
+        st.markdown("---")
+        st.markdown("### 3. Effective Active Length ($L_{ad}$)")
+        st.latex(r"L_{ad} = 2 \cdot D_0 \cdot \left( \frac{E_p}{E_{sD}} \right)^n")
+        
+        ratio_val = (E_p_corrected * 1000.0) / E_sD
+        st.write(f"* **Selected Exponent ($n$):** ${exponent:.2f}$")
+        st.write(f"* **Effective Active Depth ($L_{{ad}}$):** $2 \\times {D_0:.2f} \\times ({ratio_val:.1f})^{{{exponent:.2f}}} = \\mathbf{{{L_ad:.2f}\\text{{ m}}}}$")
+
+        st.markdown("---")
+        st.markdown("### 4. Subgrade Modulus Gradient ($k$) & Relative Length ($Z = L/T$)")
+        
+        if "Option 1" in k_mode:
+            st.latex(r"T = \left( \frac{E_p I_p}{k} \right)^{0.2}")
+            st.latex(r"Z = \frac{L_p}{T}")
+            st.write(f"* **Design Modulus Gradient ($k$):** ${k_nominal:.0f}$ kN/m³")
+            st.write(f"* **Characteristic Elastic Length ($T$):** ${T_nom:.3f}$ m")
+            st.write(f"* **Relative Length Ratio ($Z$):** ${Z_nom:.2f}$ $\\rightarrow$ **{classify_behavior(Z_nom)} Behavior**")
+        else:
+            st.latex(r"T_u = \left( \frac{E_p I_p}{k_{\text{lower}}} \right)^{0.2}, \quad T_l = \left( \frac{E_p I_p}{k_{\text{upper}}} \right)^{0.2}")
+            st.write(f"* **Lower Bound $k_{{lower}}$:** ${k_lower:.0f}$ kN/m³ $\\rightarrow T_u = {T_u:.3f}$ m, $Z_L = {Z_L:.2f}$ ({classify_behavior(Z_L)})")
+            st.write(f"* **Upper Bound $k_{{upper}}$:** ${k_upper:.0f}$ kN/m³ $\\rightarrow T_l = {T_l:.3f}$ m, $Z_u = {Z_u:.2f}$ ({classify_behavior(Z_u)})")
+
+        st.markdown("---")
+        st.markdown("### 5. Classification Criteria (Flexible vs. Rigid)")
+        st.markdown("""
+        * **$Z > 5.0$:** Flexible Pile Behavior (Pile Top Deflection is Independent of Tip Boundary Conditions).
+        * **$2.5 \le Z \le 5.0$:** Semi-Flexible / Intermediate Behavior.
+        * **$Z < 2.5$:** Rigid Pile Behavior (Short Stubby Pile Rotation).
+        """)
+
 # =========================================================
 # STEP 5: INERTIAL LOADING ON THE PILE
 # =========================================================
@@ -554,6 +609,30 @@ with tab_ex5:
     m6.metric("Inertial Shear ($H$)", f"{H_inertial_MN:.2f} MN")
     m7.metric("Inertial Moment ($M$)", f"{M_inertial_MNm:.1f} MN·m")
     m8.metric("Peak Deflection ($\delta_h$)", f"{delta_h_m*1000:.1f} mm")
+
+    with st.expander("📖 **Step-by-Step Calculation Details (Inertial Loading & Stiffness Matrix)**", expanded=False):
+        st.write(r"#### 1. Pile-to-Soil Stiffness Ratio")
+        st.latex(rf"\frac{{E_p}}{{E_{{sD}}}} = \frac{{{E_p_corrected:.2f} \times 10^9}}{{{E_sD:.2f} \times 10^6}} = {stiffness_ratio:.1f}")
+
+        st.write(r"#### 2. Head Stiffness Coefficients (Eurocode 8 - Square Root Variation)")
+        st.latex(rf"K_{{HH}} = 0.79 \cdot D_0 \cdot E_{{sD}} \left(\frac{{E_p}}{{E_{{sD}}}}\right)^{{0.28}} = {K_HH_single/1e6:.1f} \text{{ MN/m}}")
+        st.latex(rf"K_{{MM}} = 0.15 \cdot D_0^3 \cdot E_{{sD}} \left(\frac{{E_p}}{{E_{{sD}}}}\right)^{{0.77}} = {K_MM_single/1e6:.1f} \text{{ MNm/rad}}")
+        st.latex(rf"K_{{HM}} = -0.24 \cdot D_0^2 \cdot E_{{sD}} \left(\frac{{E_p}}{{E_{{sD}}}}\right)^{{0.53}} = {K_HM_single/1e6:.1f} \text{{ MN}}")
+
+        st.write(r"#### 3. Eccentricity ($e$) for Rigid Pile Cap (Fixed-Head Condition)")
+        st.latex(rf"e = \frac{{K_{{HM}}}}{{K_{{HH}}}} = \frac{{{K_HM_single / 1e6:.1f}}}{{{K_HH_single / 1e6:.1f}}} = {e_eccentricity:.2f} \text{{ m}}")
+
+        st.write(r"#### 4. Equivalent Horizontal Head Stiffness ($K_h$)")
+        st.latex(rf"K_h = \frac{{K_{{HH}} K_{{MM}} - K_{{HM}}^2}}{{K_{{MM}} - e K_{{HM}}}} = {K_h_eq_single/1e6:.1f} \text{{ MN/m}}")
+
+        st.write(r"#### 5. Pile Group Natural Frequency ($f_p$) and Response Acceleration")
+        st.latex(rf"f_p = \frac{{1}}{{2\pi}} \sqrt{{\frac{{N_{{group}} \cdot K_h}}{{m}}}} = \frac{{1}}{{2\pi}} \sqrt{{\frac{{{n_piles} \times {K_h_eq_single/1e6:.1f} \times 10^6}}{{{mass_kg:.0f}}}}} = {f_p_group:.2f} \text{{ Hz}} \quad (T_p = {T_p_group:.2f} \text{{ s}})")
+        st.latex(rf"a_{{response}} = \left(\frac{{S_{{da}}}}{{a_g}}\right) \cdot a_g = {spectral_acc_factor} \times {a_g:.2f}\text{{g}} = {a_response:.2f} \text{{ m/s}}^2")
+
+        st.write(r"#### 6. Inertial Load & Displacement Calculations")
+        st.latex(rf"H = m \cdot a_{{response}} = {m_super:.0f} \times 10^3 \times {a_response:.2f} = {H_inertial_MN:.2f} \text{{ MN}}")
+        st.latex(rf"M = H \cdot h = {H_inertial_MN:.2f} \times {h_mass:.1f} = {M_inertial_MNm:.1f} \text{{ MN}}\cdot\text{{m}}")
+        st.latex(rf"\delta_h = \frac{{H}}{{N_{{group}} \cdot K_h}} = \frac{{{H_inertial_MN:.2f}}}{{{n_piles} \times {K_h_eq_single/1e6:.1f}}} = {delta_h_m:.3f} \text{{ m}} \quad ({delta_h_m*1000:.1f} \text{{ mm}})")
 
 # =========================================================
 # STEP 6: KINEMATIC INTERACTION (GAZETAS, 1984)
