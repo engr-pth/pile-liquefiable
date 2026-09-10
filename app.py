@@ -718,30 +718,29 @@ with tab_ex6:
     with tab_plot2:
         freq_axis = np.linspace(0.01, 10.0, 300)
         
-        # 1. Transfer Function to Match Fig 6.4 Exact Shape
-        # Static baseline ~50mm, Peak ~100mm at f_n (~1.8Hz), Damping ~15%
-        u0_static = 50.0  # mm (f = 0 Hz)
-        beta_damp = 0.15  # Realistic damping for structural peak
-        freq_ratio_axis = freq_axis / f_n_input
+        # 1. Continuous & Smooth Free-Field Displacement (u0) Model
+        r = freq_axis / f_n_input  # Frequency Ratio (f / f_n)
         
-        # SDOF Amplification factor centered around u0_static
-        amp_factor = 1.0 / np.sqrt((1 - freq_ratio_axis**2)**2 + (2 * beta_damp * freq_ratio_axis)**2)
+        # Smooth Baseline Decay (Drops naturally from 50mm at f=0 to ~30mm at high freq)
+        u_baseline = 28.0 + 22.0 * np.exp(-0.15 * freq_axis)
         
-        # Frequency-dependent decay to match 30mm at 10Hz
-        decay_factor = 1.0 / (1.0 + 0.12 * freq_axis)
-        u0_curve = u0_static * amp_factor * decay_factor
-        u0_curve = np.clip(u0_curve, 25.0, 100.0) # Bound to Fig 6.4 limits
+        # Dynamic Resonance Peak around f_n (No clipping, smooth peak ~98mm)
+        beta = 0.22  # Damping factor
+        resonance_amp = (r**2) / np.sqrt((1 - r**2)**2 + (2 * beta * r)**2)
+        resonance_peak = 33.0 * resonance_amp * np.exp(-0.35 * r)
+        
+        # Complete u0 Curve
+        u0_curve = u_baseline + resonance_peak
 
-        # 2. Gazetas Kinematic Interaction Factor (I_u)
-        F_curve = freq_ratio_axis * (stiffness_ratio ** exp_Ep) * (L_D_ratio ** exp_LD)
+        # 2. Kinematic Interaction Factor (I_u) Curve
+        F_curve = r * (stiffness_ratio ** exp_Ep) * (L_D_ratio ** exp_LD)
         I_u_curve = coeff_a * (F_curve**4) + coeff_b * (F_curve**3) + coeff_c * (F_curve**2) + 1.0
-        I_u_curve = np.maximum(I_u_curve, 0.5)
+        I_u_curve = np.maximum(I_u_curve, 0.5)  # Physical minimum threshold
         
-        # High-frequency separation factor (matching Fig 6.4 gap after 5 Hz)
-        high_freq_boost = np.where(freq_axis > 4.0, 1.0 + 0.015 * (freq_axis - 4.0), 1.0)
-        up_curve = I_u_curve * u0_curve * high_freq_boost
+        # Pile Head Displacement Curve (u_p = I_u * u0)
+        up_curve = I_u_curve * u0_curve
 
-        # 3. Plotting Setup
+        # 3. Plotting Setup matching Fig 6.4 Exactly
         fig2, ax2 = plt.subplots(figsize=(8, 4.5))
         ax2.plot(freq_axis, u0_curve, label="$u_0$ (Free-field response)", color="black", linestyle="-", linewidth=1.2)
         ax2.plot(freq_axis, up_curve, label="$u_p$ (Pile head response)", color="navy", linewidth=2.5)
@@ -751,7 +750,7 @@ with tab_ex6:
         ax2.set_title("Free Field and Pile Head Response due to Kinematic Interaction", fontsize=12)
         
         ax2.set_xlim(0, 10)
-        ax2.set_ylim(20, 100)
+        ax2.set_ylim(20, 105)
         
         ax2.grid(True, linestyle="--", alpha=0.6)
         ax2.legend(loc="upper right")
