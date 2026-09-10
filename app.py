@@ -243,7 +243,8 @@ tab_ex2, tab_ex1, tab_ex3, tab_ex4, tab_ex5, tab_ex6, tab_ex7 = st.tabs([
     "📏 Step 4: SSI & Active Length (Ex 4)",
     "💥 Step 5: Inertial Loading (Ex 5)",
     "🔄 Step 6: Kinematic Interaction (Ex 6)",
-    "🌋 Step 7: Liquefaction Potential (Ex 7)"
+    "🌋 Step 7: Liquefaction Potential (Ex 7)",
+    "🎯 Step 8: Liquefaction Pile Sizing (Ex 8)"
 ])
 
 # =========================================================
@@ -982,3 +983,140 @@ with tab_ex7:
         st.write(f"* For $z \\le {z_liq_max}\\text{{ m}}$ (Liquefied Zone): $r_u = 1.0$")
         st.write(rf"* For $z > {z_liq_max}\text{{ m}}$ (Dense Non-Liquefied Zone): Excess pore pressure is assumed constant below liquefiable boundary $\Delta u(z) = \sigma'_{{v0}}({z_liq_max}\text{{m}}) = {sig_eff_at_z_liq:.1f}\text{{ kPa}}$.")
         st.latex(r"r_u(z) = \frac{\sigma'_{v0}(z_{\text{liq}})}{\sigma'_{v0}(z)}")
+
+# =========================================================
+# STEP 8: PILE SIZING BASED ON LIQUEFACTION CONSIDERATIONS (EX 8)
+# =========================================================
+with tab_ex8:
+    st.subheader("6.4.2 Example 8: Pile Sizing based on Liquefaction Considerations")
+    st.caption("Axial Failure Modes (ULS & SLS) under Liquefaction Conditions")
+
+    col_s8_1, col_s8_2 = st.columns([1.1, 1.0])
+
+    with col_s8_1:
+        st.markdown("##### ⚙️ Input Parameters for Sizing")
+        
+        z_L_input = st.number_input(
+            "Liquefaction Depth, $z_L$ (m)", 
+            value=float(z_liq_max) if z_liq_max > 0 else 8.0, 
+            step=0.5,
+            help="Step 7 မှ တွက်ချက်ရရှိထားသော Liquefaction ဖြစ်ပေါ်သည့် အနက်"
+        )
+        
+        phi_deg = st.number_input("Soil Friction Angle, $\\phi$ (°)", value=30.0, step=1.0)
+        alpha_ult = st.number_input("Base Capacity Ratio, $\\alpha_{ult} = Q_b / Q_u$", value=0.10, step=0.01)
+        fos_static_target = st.number_input("Target Static FOS", value=2.0, step=0.1)
+
+    with col_s8_2:
+        st.markdown("##### 📐 Preliminary Bounds (ULS & Instability Check)")
+        
+        # Calculate design bounds based on Fig 6.8 & Ex 8 criteria
+        L_p_min_chart = 11.0
+        L_p_max_chart = 21.0
+
+        st.info(f"<b>Design Range from ULS Instability Chart (Fig 6.8):</b><br/>"
+                f"<b>{L_p_min_chart:.1f} m < $L_p$ < {L_p_max_chart:.1f} m</b>", unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.subheader("📊 FOS Criteria and Required Pile Count ($N$) Curves")
+
+    # Generate range of Pile Lengths (L_p)
+    L_p_array = np.linspace(1.0, 25.0, 200)
+    
+    # 1. Demand Curve r_u,base = z_L / L_p (Eq 6.68)
+    r_u_base_array = np.clip(z_L_input / L_p_array, 0.0, 1.0)
+
+    # 2. FOS for Liquefaction-induced Bearing Capacity Failure (Eq 6.69)
+    phi_rad = np.radians(phi_deg)
+    exp_bearing = (3.0 - np.sin(phi_rad)) / (3.0 * (1.0 + np.sin(phi_rad)))
+    
+    fos_bearing_array = []
+    for ru in r_u_base_array:
+        if ru >= 1.0:
+            fos_b = 99.0
+        else:
+            denom = alpha_ult * ((1.0 - ru) ** exp_bearing) - alpha_ult + 1.0
+            fos_b = 1.0 / denom if denom > 0 else 99.0
+        fos_bearing_array.append(min(fos_b, 10.0))
+
+    # 3. FOS for Liquefaction-induced Settlement (Eq 6.70)
+    fos_settlement_array = 1.0 + 5.5 * (r_u_base_array ** 3.5)
+
+    # 4. Static FOS criterion
+    fos_static_array = np.full_like(L_p_array, fos_static_target)
+
+    # Maximum governing FOS at each depth
+    fos_max_array = np.maximum.reduce([fos_static_array, fos_bearing_array, fos_settlement_array])
+
+    # Minimum number of piles required N = (P_total * FOS_max) / Q_u (Eq 6.71)
+    # Using Q_u_mtd from Step 1 as static capacity reference
+    Q_u_ref = Q_u_mtd if Q_u_mtd > 0 else 5000.0  # kN
+    N_required_array = (P_axial * 1000.0 * fos_max_array) / Q_u_ref
+
+    # Plots (Fig 6.9 representation)
+    p_col1, p_col2 = st.columns(2)
+
+    with p_col1:
+        fig_fos, ax_f = plt.subplots(figsize=(6, 5))
+        ax_f.plot(fos_static_array, L_p_array, 'o-', color='black', markevery=10, markersize=4, label=f"Static, FOS = {fos_static_target:.0f}")
+        ax_f.plot(fos_bearing_array, L_p_array, 's-', color='navy', markevery=10, markersize=4, label="Bearing capacity")
+        ax_f.plot(fos_settlement_array, L_p_array, '^-', color='darkgreen', markevery=10, markersize=4, label="Settlement")
+        
+        ax_f.axhline(y=z_L_input, color='red', linestyle='--', alpha=0.7, label=f"Liquefaction Depth ({z_L_input}m)")
+        ax_f.axhline(y=12.0, color='orange', linestyle=':', alpha=0.8, label="Static Dominance Bound (12m)")
+
+        ax_f.set_xlabel("Minimum FOS", fontsize=11, fontweight='bold')
+        ax_f.set_ylabel("Pile Length $L_p$ (m)", fontsize=11, fontweight='bold')
+        ax_f.set_xlim(0, 10)
+        ax_f.set_ylim(25, 0)  # Inverted depth axis
+        ax_f.grid(True, linestyle="--", alpha=0.6)
+        ax_f.legend(loc="lower right")
+        st.pyplot(fig_fos)
+
+    with p_col2:
+        fig_n, ax_n = plt.subplots(figsize=(6, 5))
+        ax_n.semilogx(N_required_array, L_p_array, 'o-r', markevery=10, markersize=4, linewidth=2, label="Req. Pile Group Size N")
+        
+        ax_n.axhline(y=L_p_min_chart, color='gray', linestyle='--')
+        ax_n.axhline(y=L_p_max_chart, color='gray', linestyle='--')
+        ax_n.axvspan(1, 1000, ymin=1 - (L_p_max_chart/25.0), ymax=1 - (L_p_min_chart/25.0), color='green', alpha=0.1, label="Suitable ULS Range")
+
+        ax_n.set_xlabel("Minimum number of piles N", fontsize=11, fontweight='bold')
+        ax_n.set_ylabel("Pile Length $L_p$ (m)", fontsize=11, fontweight='bold')
+        ax_n.set_xlim(1, 1000)
+        ax_n.set_ylim(25, 0)  # Inverted depth axis
+        ax_n.grid(True, which="both", linestyle="--", alpha=0.6)
+        ax_n.legend(loc="lower right")
+        st.pyplot(fig_n)
+
+    st.markdown("---")
+    st.subheader("📋 Table 6.4: Summary of Final Pile Group Design")
+
+    # Evaluation summary table
+    design_summary_df = pd.DataFrame({
+        "Parameter": ["Pile Outer Diameter ($D_0$)", "Flexural Rigidity ($EI$)", "Yield Moment Capacity", "Suitable Pile Length Range ($L_p$)", "Min. Piles in Group ($N$)"],
+        "Value": [f"{D_0:.2f} m", f"{E_I/1e6:.0f} MN·m²", "1800 kNm", f"12 m < L_p < {L_p_max_chart:.0f} m", "N ≥ 4 (for all L_p > 12m)"],
+        "Design Condition / Constraint": ["Selected Section", "Section Modulus", "Structural Limit", "Static Condition Dominates & Avoids Instability", "Satisfies Axial & Liquefaction Criteria"]
+    })
+    st.dataframe(design_summary_df, use_container_width=True)
+
+    with st.expander("📖 **Step-by-Step Calculation Details (Example 8: Pile Sizing)**", expanded=False):
+        st.write(r"#### 1. Demand Curve Equation")
+        st.latex(rf"r_{{u,base}} = \frac{{z_L}}{{L_p}} = \frac{{{z_L_input:.1f}}}{{L_p}}")
+
+        st.write(r"#### 2. Liquefaction-Induced Bearing Failure Criterion")
+        st.latex(r"FOS \ge \frac{1}{\alpha_{ult} \left(1 - r_{u,base}\right)^{\frac{3-\sin\phi}{3(1+\sin\phi)}} - \alpha_{ult} + 1}")
+
+        st.write(r"#### 3. Liquefaction-Induced Settlement Criterion (>0.1 D₀)")
+        st.latex(r"FOS \ge 1 + 5.5 \left( r_{u,base} \right)^{3.5}")
+
+        st.write(r"#### 4. Minimum Required Number of Piles ($N$)")
+        st.latex(r"N = \frac{P_{total} \cdot FOS_{max}}{P_{ult}}")
+
+        st.markdown("""
+        **Summary of Design Regions (Fig 6.9):**
+        * **$L_p < 8\text{m}$:** Liquefiable layer ထဲတွင် pile တည်ရှိသဖြင့် Bearing failure စိုးမိုးပြီး FOS အလွန်မြင့်ရန် လိုအပ်သဖြင့် မသင့်တော်ပါ။
+        * **$8\text{m} < L_p < 12\text{m}$:** Liquefaction-induced settlement စိုးမိုးပါသည်။ Pile အရေအတွက် ပိုမိုလိုအပ်ပါသည်။
+        * **$L_p > 12\text{m}$:** Static FOS condition ($FOS=2$) က စိုးမိုးပြီး Liquefaction ကြောင့် axial စွမ်းဆောင်ရည် ထိခိုက်မှု မရှိတော့ပါ။
+        * **$L_p > 21\text{m}$:** Instability (Buckling/ULS) ကြောင့် Pile Length ကို $21\text{m}$ ထက် မပိုသင့်ပါ။
+        """)
