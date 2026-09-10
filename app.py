@@ -1371,20 +1371,40 @@ with tab_ex10:
         
     with col_m3:
         st.markdown("**Method 3 Options (Increase Pile Size):**")
-        D_m3_choice = st.selectbox("Select Pile Diameter for Method 3, D₀ (m)", [1.00, 1.20, 1.50], index=0)
+        
+        # Selectbox အစား တိုက်ရိုက် ရိုက်ထည့်နိုင်သော Number Input သို့ ပြောင်းလဲခြင်း
+        D_m3_choice = st.number_input(
+            "Enter Pile Diameter for Method 3, D₀ (m)", 
+            min_value=0.50, 
+            max_value=3.00, 
+            value=1.00, 
+            step=0.05,
+            format="%.2f"
+        )
         N_m3 = st.number_input("Number of Piles for Method 3 (N_m3)", min_value=4, max_value=25, value=4, step=1)
 
-    # Section & Design Properties Mapping (Cubrinovski Ex 10 Parameters)
-    prop_dict = {
-        0.75: {"EI": 398000.0,  "My": 1800.0,  "t_wall": 0.016, "B_cap": 6.0,  "f_delta": 7.20, "C_disp": 1.08},
-        1.00: {"EI": 1257000.0, "My": 4260.0,  "t_wall": 0.016, "B_cap": 8.0,  "f_delta": 2.15, "C_disp": 0.94},
-        1.20: {"EI": 2200000.0, "My": 6500.0,  "t_wall": 0.018, "B_cap": 8.5,  "f_delta": 1.40, "C_disp": 0.90},
-        1.50: {"EI": 4500000.0, "My": 11000.0, "t_wall": 0.020, "B_cap": 9.0,  "f_delta": 1.00, "C_disp": 0.85}
-    }
+    # Any Dynamic Diameter (D) အတွက် Structural Properties များကို Interpolate ပေးမည့် Function
+    def get_pile_props(D_val):
+        ref_D = np.array([0.75, 1.00, 1.20, 1.50])
+        ref_EI = np.array([398000.0, 1257000.0, 2200000.0, 4500000.0])
+        ref_My = np.array([1800.0, 4260.0, 6500.0, 11000.0])
+        ref_t = np.array([0.016, 0.016, 0.018, 0.020])
+        ref_Bcap = np.array([6.0, 8.0, 8.5, 9.0])
+        ref_fdelta = np.array([7.20, 2.15, 1.40, 1.00])
+        ref_Cdisp = np.array([1.08, 0.94, 0.90, 0.85])
+
+        return {
+            "EI": float(np.interp(D_val, ref_D, ref_EI)),
+            "My": float(np.interp(D_val, ref_D, ref_My)),
+            "t_wall": float(np.interp(D_val, ref_D, ref_t)),
+            "B_cap": float(np.interp(D_val, ref_D, ref_Bcap)),
+            "f_delta": float(np.interp(D_val, ref_D, ref_fdelta)),
+            "C_disp": float(np.interp(D_val, ref_D, ref_Cdisp))
+        }
 
     # Beam-Elastic Mechanics Calculation Function
     def calc_lateral_spreading(N_piles, D_p, H_force):
-        prop = prop_dict[D_p]
+        prop = get_pile_props(D_p)  # Dynamic Property Retrieval
         EI_val = prop["EI"]
         My_val = prop["My"]
         B_cap_val = prop["B_cap"]
@@ -1395,11 +1415,11 @@ with tab_ex10:
         F_cap_per_pile = (F_cap_total + H_force) / N_piles
         p_L = q_lat * D_p  # kN/m
         
-        # Elastic Beam Lateral Displacement Formula with Soil & Cap Interaction
+        # Elastic Beam Lateral Displacement Formula
         delta_elastic = (F_cap_per_pile * (L_eff_sp**3) / (12 * EI_val)) + (p_L * (L_eff_sp**4) / (24 * EI_val))
         delta_h = delta_elastic * C_disp
         
-        # Yield Displacement based on Section Mechanics (Fig 6.12 Limits)
+        # Yield Displacement based on Section Mechanics
         delta_yield = (My_val * (L_eff_sp**2)) / (6 * EI_val)
         
         # Residual Displacement (H = 0)
