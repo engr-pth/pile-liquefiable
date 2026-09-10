@@ -1081,7 +1081,7 @@ with tab_ex8:
         ax_f.legend(loc="lower right")
         st.pyplot(fig_fos)
 
-    with p_col2:
+with p_col2:
         fig_n, ax_n = plt.subplots(figsize=(6, 5))
         ax_n.semilogx(N_required_array, L_p_array, 'o-r', markevery=10, markersize=4, linewidth=2, label="Req. Pile Group Size N")
         
@@ -1093,6 +1093,11 @@ with tab_ex8:
         ax_n.set_ylabel("Pile Length $L_p$ (m)", fontsize=11, fontweight='bold')
         ax_n.set_xlim(1, 1000)
         ax_n.set_ylim(25, 0)  # Inverted depth axis
+
+        # X-axis tick labels ကို 1, 10, 100, 1000 အဖြစ် ပြောင်းလဲခြင်း
+        ax_n.set_xticks([1, 10, 100, 1000])
+        ax_n.set_xticklabels(['1', '10', '100', '1000'])
+
         ax_n.grid(True, which="both", linestyle="--", alpha=0.6)
         ax_n.legend(loc="lower right")
         st.pyplot(fig_n)
