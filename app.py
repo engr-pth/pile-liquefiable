@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="Pile Foundation Design WorkFlow", layout="wide")
 
 st.title("🏗️ Geotechnical & Foundation Design Workflow")
-st.caption("CPT Analysis ➔ Static Capacity ➔ Dynamic Stiffness ➔ SSI ➔ Inertial Loading ➔ Kinematic Interaction ➔ Liquefaction Potential ➔ Pile Sizing ➔ liquefied ground response ➔ Lateral Spreading Analysis on Pile Group")
+st.caption("CPT Analysis ➔ Static Capacity ➔ Dynamic Stiffness ➔ SSI ➔ Inertial Loading ➔ Kinematic Interaction ➔ Liquefaction Potential ➔ Pile Sizing ➔ liquefied ground response ➔ Lateral Spreading Analysis on Pile Group ➔ 3-Layer Soil with Cohesive Crust")
 
 # ---------------------------------------------------------
 # Design Procedure Flowchart Section
@@ -261,7 +261,7 @@ f_n = v_s / (4 * H_top)
 # ---------------------------------------------------------
 # Tabs Section
 # ---------------------------------------------------------
-tab_ex2, tab_ex1, tab_ex3, tab_ex4, tab_ex5, tab_ex6, tab_ex7, tab_ex8, tab_ex9, tab_ex10 = st.tabs([
+tab_ex2, tab_ex1, tab_ex3, tab_ex4, tab_ex5, tab_ex6, tab_ex7, tab_ex8, tab_ex9, tab_ex10, tab_ex11 = st.tabs([
     "📊 Step 1: CPT Capacity (Ex 2)", 
     "📌 Step 2: Broms Static Capacity (Ex 1)", 
     "🌊 Step 3: Soil Stiffness (Ex 3)",
@@ -271,7 +271,8 @@ tab_ex2, tab_ex1, tab_ex3, tab_ex4, tab_ex5, tab_ex6, tab_ex7, tab_ex8, tab_ex9,
     "🌋 Step 7: Liquefaction Potential (Ex 7)",
     "🎯 Step 8: Pile Sizing based on Liquefaction considerations (Ex 8)",
     "🌊 Step 9: Liquefied Ground Response (Ex 9)",
-    "📏 Step 10: Lateral Spreading Analysis on Pile Group (Ex 10)"
+    "📏 Step 10: Lateral Spreading Analysis on Pile Group (Ex 10)",
+    "🌊 Step 11: 3-Layer Soil with Cohesive Crust (Ex 11)"
 ])
 
 # =========================================================
@@ -1586,3 +1587,137 @@ with tab_ex10:
     ax2.legend()
 
     st.pyplot(fig2)
+
+# ==========================================
+# STEP 11: THREE-LAYER SOIL WITH COHESIVE CRUST (EX 11)
+# ==========================================
+with tab_ex11:
+    st.header("Step 11: Pile Group in Three-Layer Soil Profile Subject to Lateral Spreading")
+    st.markdown("""
+    This step evaluates the foundation performance considering a **Non-liquefiable Cohesive Crustal Layer (Clay)** 
+    surrounding the pile cap above the liquefied sand layer (Example 11 / Cubrinovski et al. method).
+    """)
+
+    # Primary Input Parameters for Example 11
+    col_e11_1, col_e11_2, col_e11_3 = st.columns(3)
+    with col_e11_1:
+        s_u = st.number_input("Undrained Shear Strength of Clay Crust, s_u (kPa)", value=20.0, step=1.0)
+        q_lat_liq = st.number_input("Liquefied Layer Lateral Pressure, q_lat (kPa)", value=15.0, step=1.0)
+    with col_e11_2:
+        B_cap_ex11 = st.number_input("Pile Cap Width, B_cap (m)", value=6.0, step=0.5)
+        t_cap_ex11 = st.number_input("Pile Cap Thickness, t_cap (m)", value=1.5, step=0.1)
+    with col_e11_3:
+        H_peak_ex11 = st.number_input("Peak Inertial Force, H (kN)", value=1690.0, step=50.0)
+        L_eff_ex11 = st.number_input("Effective Pile Length, L (m)", value=11.83, step=0.1)
+
+    # 1. Ultimate Passive Force from Crust Layer on Pile Cap (Eq. 2.17 & Eq. 6.86)
+    # F_soil = (3*pi + 2) * s_u * B_cap * t_cap
+    q_crust = (3 * np.pi + 2) * s_u  # kPa
+    F_soil = q_crust * B_cap_ex11 * t_cap_ex11  # kN
+
+    # Pile Properties for Ex 11 (Standard 2x2, D=0.75m)
+    prop_ex11 = get_pile_props(0.75)
+    EI_ex11 = prop_ex11["EI"]
+    My_ex11 = prop_ex11["My"]
+    C_disp_ex11 = prop_ex11["C_disp"]
+    N_ex11 = 4  # 2x2 Pile Group
+
+    p_L_ex11 = q_lat_liq * 0.75  # Drag pressure on liquefied pile section (kN/m)
+
+    # Residual Displacement (H = 0) - Eq. 6.87
+    F_cap_res_ex11 = F_soil / N_ex11
+    delta_res_ex11 = C_disp_ex11 * (
+        (F_cap_res_ex11 * (L_eff_ex11**3) / (12 * EI_ex11)) + 
+        (p_L_ex11 * (L_eff_ex11**4) / (24 * EI_ex11))
+    )
+
+    # Peak Transient Displacement (H = 1690 kN) - Eq. 6.88
+    F_cap_peak_ex11 = (F_soil + H_peak_ex11) / N_ex11
+    delta_peak_ex11 = C_disp_ex11 * (
+        (F_cap_peak_ex11 * (L_eff_ex11**3) / (12 * EI_ex11)) + 
+        (p_L_ex11 * (L_eff_ex11**4) / (24 * EI_ex11))
+    )
+
+    # Yield Displacement
+    delta_yield_ex11 = (My_ex11 * (L_eff_ex11**2)) / (6 * EI_ex11)
+    ratio_ex11 = delta_peak_ex11 / delta_yield_ex11
+
+    status_ex11 = "❌ Unsuitable (Severe Yielding due to Crust Load)" if ratio_ex11 > 1.0 else "✅ Suitable"
+
+    st.markdown("---")
+    st.subheader("1. Example 10 vs Example 11 Performance Comparison")
+
+    comp_ex10_11 = {
+        "Parameter / Metric": [
+            "Soil Profile Type",
+            "Crust Layer Shear Strength, s_u (kPa)",
+            "Force from Crust Layer on Cap, F_soil (kN)",
+            "Residual Displacement, δ_res (mm)",
+            "Peak Transient Displacement, δ_h (mm)",
+            "Yield Displacement, δ_yield (mm)",
+            "Performance Ratio (δ_h / δ_yield)",
+            "Design Status"
+        ],
+        "Example 10 (2-Layer Soil)": [
+            "2-Layer (Liquefied Sand + Dense Sand)",
+            "N/A (No Crust)",
+            f"{q_lat * B_cap_ex11 * t_cap_ex11:.1f}",
+            f"{d_res1 * 1000:.1f}",
+            f"{d_peak1 * 1000:.1f}",
+            f"{d_y1 * 1000:.1f}",
+            f"{ratio_1:.2f}",
+            status_1
+        ],
+        "Example 11 (3-Layer Soil)": [
+            "3-Layer (Cohesive Crust + Liquefied Sand + Dense)",
+            f"{s_u:.1f}",
+            f"{F_soil:.1f}",
+            f"{delta_res_ex11 * 1000:.1f}",
+            f"{delta_peak_ex11 * 1000:.1f}",
+            f"{delta_yield_ex11 * 1000:.1f}",
+            f"{ratio_ex11:.2f}",
+            status_ex11
+        ]
+    }
+
+    st.table(pd.DataFrame(comp_ex10_11))
+
+    # Step-by-Step Calculation Details Expander
+    with st.expander("📖 Step-by-Step Calculation Details (Example 11 Mechanics)"):
+        st.markdown("### 1. Governing Equations for Cohesive Crust Layer")
+        st.latex(r"q_{\text{crust}} = (3\pi + 2) \cdot s_u")
+        st.latex(r"F_{\text{soil}} = q_{\text{crust}} \cdot B_{\text{cap}} \cdot t_{\text{cap}} = (3\pi + 2) \cdot s_u \cdot B_{\text{cap}} \cdot t_{\text{cap}}")
+        st.latex(r"\delta_h = C_{\text{disp}} \left( \frac{\frac{F_{\text{soil}} + H}{N} \cdot L^3}{12 E I} + \frac{p_L \cdot L^4}{24 E I} \right)")
+
+        st.markdown("---")
+        st.markdown("### 2. Detailed Intermediate Values")
+        st.write(f"- **Crust Lateral Unit Pressure ($q_{{\\text{{crust}}}}$)**: `{q_crust:.2f} kPa`")
+        st.write(f"- **Total Crust Force on Pile Cap ($F_{{\\text{{soil}}}}$)**: `{F_soil:.1f} kN` (Exact textbook value: ~2056 kN)")
+        st.write(f"- **Soil Drag Pressure on Liquefied Section ($p_L$)**: `{p_L_ex11:.2f} kN/m`")
+        st.write(f"- **Residual Displacement ($\delta_r$)**: `{delta_res_ex11*1000:.1f} mm` (Textbook: 218 mm)")
+        st.write(f"- **Peak Transient Displacement ($\delta_h$)**: `{delta_peak_ex11*1000:.1f} mm` (Textbook: 377 mm)")
+        st.write(f"- **Performance Ratio ($\delta_h / \delta_{{\\text{{yield}}}}$)**: `{ratio_ex11:.2f}`")
+
+    # Comparison Plot
+    st.markdown("---")
+    st.subheader("2. Displacement Comparison Plot (Ex 10 vs Ex 11)")
+
+    fig_ex11, ax_ex11 = plt.subplots(figsize=(8, 4))
+    labels = ["Ex 10 (2-Layer)", "Ex 11 (3-Layer with Crust)"]
+    displacements = [d_peak1 * 1000, delta_peak_ex11 * 1000]
+    yield_limits = [d_y1 * 1000, delta_yield_ex11 * 1000]
+
+    x = np.arange(len(labels))
+    w = 0.35
+
+    ax_ex11.bar(x - w/2, displacements, w, label='Peak Displacement δ_h (mm)', color='crimson')
+    ax_ex11.bar(x + w/2, yield_limits, w, label='Yield Limit δ_yield (mm)', color='seagreen')
+
+    ax_ex11.set_ylabel('Displacement (mm)')
+    ax_ex11.set_title('Impact of Cohesive Crust Layer on Pile Group Displacement')
+    ax_ex11.set_xticks(x)
+    ax_ex11.set_xticklabels(labels)
+    ax_ex11.legend()
+    ax_ex11.grid(True, linestyle=':', axis='y')
+
+    st.pyplot(fig_ex11)
