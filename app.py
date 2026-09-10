@@ -996,9 +996,12 @@ with tab_ex8:
     with col_s8_1:
         st.markdown("##### ⚙️ Input Parameters for Sizing")
         
+        # Check if variables from previous steps exist, else fallback to defaults
+        z_liq_default = float(z_liq_max) if 'z_liq_max' in locals() and z_liq_max > 0 else 8.0
+        
         z_L_input = st.number_input(
             "Liquefaction Depth, $z_L$ (m)", 
-            value=float(z_liq_max) if z_liq_max > 0 else 8.0, 
+            value=z_liq_default, 
             step=0.5,
             help="Step 7 မှ တွက်ချက်ရရှိထားသော Liquefaction ဖြစ်ပေါ်သည့် အနက်"
         )
@@ -1014,8 +1017,11 @@ with tab_ex8:
         L_p_min_chart = 11.0
         L_p_max_chart = 21.0
 
-        st.info(f"<b>Design Range from ULS Instability Chart (Fig 6.8):</b><br/>"
-                f"<b>{L_p_min_chart:.1f} m < $L_p$ < {L_p_max_chart:.1f} m</b>", unsafe_allow_html=True)
+        # Fixed: Removed unsafe_allow_html=True from st.info
+        st.info(
+            f"**Design Range from ULS Instability Chart (Fig 6.8):**\n\n"
+            f"**{L_p_min_chart:.1f} m < $L_p$ < {L_p_max_chart:.1f} m**"
+        )
 
     st.markdown("---")
     st.subheader("📊 FOS Criteria and Required Pile Count ($N$) Curves")
@@ -1048,10 +1054,12 @@ with tab_ex8:
     # Maximum governing FOS at each depth
     fos_max_array = np.maximum.reduce([fos_static_array, fos_bearing_array, fos_settlement_array])
 
+    # Reference values with safe fallback
+    Q_u_ref = Q_u_mtd if 'Q_u_mtd' in locals() and Q_u_mtd > 0 else 5000.0
+    P_axial_ref = P_axial if 'P_axial' in locals() and P_axial > 0 else 2000.0
+
     # Minimum number of piles required N = (P_total * FOS_max) / Q_u (Eq 6.71)
-    # Using Q_u_mtd from Step 1 as static capacity reference
-    Q_u_ref = Q_u_mtd if Q_u_mtd > 0 else 5000.0  # kN
-    N_required_array = (P_axial * 1000.0 * fos_max_array) / Q_u_ref
+    N_required_array = (P_axial_ref * 1000.0 * fos_max_array) / Q_u_ref
 
     # Plots (Fig 6.9 representation)
     p_col1, p_col2 = st.columns(2)
@@ -1092,10 +1100,12 @@ with tab_ex8:
     st.markdown("---")
     st.subheader("📋 Table 6.4: Summary of Final Pile Group Design")
 
-    # Evaluation summary table
+    D_0_val = f"{D_0:.2f} m" if 'D_0' in locals() else "1.00 m"
+    EI_val = f"{E_I/1e6:.0f} MN·m²" if 'E_I' in locals() else "2000 MN·m²"
+
     design_summary_df = pd.DataFrame({
         "Parameter": ["Pile Outer Diameter ($D_0$)", "Flexural Rigidity ($EI$)", "Yield Moment Capacity", "Suitable Pile Length Range ($L_p$)", "Min. Piles in Group ($N$)"],
-        "Value": [f"{D_0:.2f} m", f"{E_I/1e6:.0f} MN·m²", "1800 kNm", f"12 m < L_p < {L_p_max_chart:.0f} m", "N ≥ 4 (for all L_p > 12m)"],
+        "Value": [D_0_val, EI_val, "1800 kNm", f"12 m < L_p < {L_p_max_chart:.0f} m", "N ≥ 4 (for all L_p > 12m)"],
         "Design Condition / Constraint": ["Selected Section", "Section Modulus", "Structural Limit", "Static Condition Dominates & Avoids Instability", "Satisfies Axial & Liquefaction Criteria"]
     })
     st.dataframe(design_summary_df, use_container_width=True)
@@ -1115,8 +1125,8 @@ with tab_ex8:
 
         st.markdown("""
         **Summary of Design Regions (Fig 6.9):**
-        * **$L_p < 8\text{m}$:** Liquefiable layer ထဲတွင် pile တည်ရှိသဖြင့် Bearing failure စိုးမိုးပြီး FOS အလွန်မြင့်ရန် လိုအပ်သဖြင့် မသင့်တော်ပါ။
-        * **$8\text{m} < L_p < 12\text{m}$:** Liquefaction-induced settlement စိုးမိုးပါသည်။ Pile အရေအတွက် ပိုမိုလိုအပ်ပါသည်။
-        * **$L_p > 12\text{m}$:** Static FOS condition ($FOS=2$) က စိုးမိုးပြီး Liquefaction ကြောင့် axial စွမ်းဆောင်ရည် ထိခိုက်မှု မရှိတော့ပါ။
-        * **$L_p > 21\text{m}$:** Instability (Buckling/ULS) ကြောင့် Pile Length ကို $21\text{m}$ ထက် မပိုသင့်ပါ။
+        * **$L_p < 8\\text{m}$:** Liquefiable layer ထဲတွင် pile တည်ရှိသဖြင့် Bearing failure စိုးမိုးပြီး FOS အလွန်မြင့်ရန် လိုအပ်သဖြင့် မသင့်တော်ပါ။
+        * **$8\\text{m} < L_p < 12\\text{m}$:** Liquefaction-induced settlement စိုးမိုးပါသည်။ Pile အရေအတွက် ပိုမိုလိုအပ်ပါသည်။
+        * **$L_p > 12\\text{m}$:** Static FOS condition ($FOS=2$) က စိုးမိုးပြီး Liquefaction ကြောင့် axial စွမ်းဆောင်ရည် ထိခိုက်မှု မရှိတော့ပါ။
+        * **$L_p > 21\\text{m}$:** Instability (Buckling/ULS) ကြောင့် Pile Length ကို $21\\text{m}$ ထက် မပိုသင့်ပါ။
         """)
