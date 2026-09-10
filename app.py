@@ -270,7 +270,7 @@ tab_ex2, tab_ex1, tab_ex3, tab_ex4, tab_ex5, tab_ex6, tab_ex7, tab_ex8, tab_ex9,
     "🔄 Step 6: Kinematic Interaction (Ex 6)",
     "🌋 Step 7: Liquefaction Potential (Ex 7)",
     "🎯 Step 8: Pile Sizing based on Liquefaction considerations (Ex 8)",
-    "🌊 Step 9: Liquefied Ground Response (Ex 9),"
+    "🌊 Step 9: Liquefied Ground Response (Ex 9)",
     "📏 Step 10: Lateral Spreading Analysis on Pile Group (Ex 10)"
 ])
 
