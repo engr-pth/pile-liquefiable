@@ -378,9 +378,15 @@ with tab_ex3:
     st.subheader("6.3.1 Soil Stiffness and Natural Frequency")
     
     gamma_percent = gamma_sol * 100
-    G_s = G_ratio * G_0
+    G_s = G_ratio * G_0  # MPa
     nu = 0.5
-    E_s = 2 * G_s * (1 + nu)
+    E_s = 2 * G_s * (1 + nu)  # MPa
+
+    # Shear wave velocity (v_s) calculation with proper unit conversion
+    G_s_pa = G_s * 1e6  # Convert MPa to Pa (N/m²)
+    rho_soil = 1700.0   # kg/m³
+    v_s = np.sqrt(G_s_pa / rho_soil)  # m/s
+    f_n = v_s / (4 * H_top)  # Hz
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Confining Stress ($p'$)", f"{p_prime:.2f} kPa")
@@ -404,11 +410,11 @@ with tab_ex3:
         st.latex(rf"\tau_{{max}} = 0.65 \cdot a_g \cdot \sigma_{{v0, total}} \cdot r_d = 0.65 \times {a_g} \times 68.0 \times {r_d:.2f} = {tau_max:.2f} \text{{ kPa}}")
         st.write(f"* Solved Shear Strain ($\\gamma$ via Hyperbolic Model): **\\gamma = {gamma_percent:.4f} %**")
 
-        st.write(r"#### 3. Secant Modulus ($G_s$, $E_s$) & Wave Velocity ($v_s$)")
+        st.write(r"#### 3. Secant Modulus ($G_s$, $E_s$), Shear Wave Velocity ($v_s$) & Natural Frequency ($f_n$)")
         st.latex(rf"\frac{{G_s}}{{G_0}} = \frac{{1}}{{\left(1 + \frac{{\gamma}}{{\gamma_r}}\right)^c}} = {G_ratio*100:.2f} \%")
-        st.latex(rf"G_s = {G_ratio:.4f} \times {G_0:.2f} = {G_s:.2f} \text{{ MPa}}")
+        st.latex(rf"G_s = {G_ratio:.4f} \times {G_0:.2f} = {G_s:.2f} \text{{ MPa}} \quad ({G_s_pa:.0f} \text{{ Pa}})")
         st.latex(rf"E_s = 2 G_s (1 + \nu) = 3 G_s = {E_s:.2f} \text{{ MPa}}")
-        st.latex(rf"v_s = \sqrt{{\frac{{G_s}}{{\rho}}}} = \sqrt{{\frac{{{G_s*1e6:.0f}}}{{1700}}}} = {v_s:.2f} \text{{ m/s}}")
+        st.latex(rf"v_s = \sqrt{{\frac{{G_s}}{{\rho}}}} = \sqrt{{\frac{{{G_s_pa:.0f}}}{{{rho_soil:.0f}}}}} = {v_s:.2f} \text{{ m/s}}")
         st.latex(rf"f_n = \frac{{v_s}}{{4 H_1}} = \frac{{{v_s:.2f}}}{{4 \times {H_top}}} = {f_n:.2f} \text{{ Hz}}")
 
 # =========================================================
