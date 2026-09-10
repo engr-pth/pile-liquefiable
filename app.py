@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="Pile Foundation Design WorkFlow", layout="wide")
 
 st.title("🏗️ Geotechnical & Foundation Design Workflow")
-st.caption("CPT Analysis ➔ Static Capacity ➔ Dynamic Stiffness ➔ SSI ➔ Inertial Loading ➔ Kinematic Interaction ➔ Liquefaction Potential")
+st.caption("CPT Analysis ➔ Static Capacity ➔ Dynamic Stiffness ➔ SSI ➔ Inertial Loading ➔ Kinematic Interaction ➔ Liquefaction Potential ➔ Pile Sizing based on Liquefaction considerations")
 
 def integrate_trapz(y, x):
     try:
@@ -244,7 +244,7 @@ tab_ex2, tab_ex1, tab_ex3, tab_ex4, tab_ex5, tab_ex6, tab_ex7, tab_ex8 = st.tabs
     "💥 Step 5: Inertial Loading (Ex 5)",
     "🔄 Step 6: Kinematic Interaction (Ex 6)",
     "🌋 Step 7: Liquefaction Potential (Ex 7)",
-    "🎯 Step 8: Liquefaction Pile Sizing (Ex 8)"
+    "🎯 Step 8: Pile Sizing based on Liquefaction considerations (Ex 8)"
 ])
 
 # =========================================================
