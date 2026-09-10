@@ -1433,3 +1433,38 @@ with tab_ex10:
     
     st.table(pd.DataFrame(summary_data))
 
+    # Parametric Plots (Fig 6.11 & 6.12)
+    st.subheader("2. Lateral Displacement vs. Number of Piles (Parametric Curves)")
+    
+    N_range = np.arange(4, 11)
+    d_h_075, d_h_100 = [], []
+
+    for n in N_range:
+        _, _, _, dh_75, _ = calc_lateral_spreading(n, 0.75, EI_075, My_075, H_peak, 2350.0)
+        _, _, _, dh_100, _ = calc_lateral_spreading(n, 1.00, EI_100, My_100, H_peak, 2350.0)
+        d_h_075.append(dh_75 * 1000)
+        d_h_100.append(dh_100 * 1000)
+
+    fig2, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
+
+    # Fig 6.11 (D = 0.75m)
+    ax1.plot(N_range, d_h_075, 'k-o', label=r'Lateral Displacement $\delta_h$')
+    ax1.axhline(d_y1 * 1000, color='r', linestyle='--', label=r'Yield Limit $\delta_{yield}$')
+    ax1.set_xlabel("Number of Piles in Group, N")
+    ax1.set_ylabel("Lateral Displacement, δ (mm)")
+    ax1.set_title("D = 0.75m Tubular Steel Piles")
+    ax1.set_ylim(0, 250)
+    ax1.grid(True, linestyle=':')
+    ax1.legend()
+
+    # Fig 6.12 (D = 1.00m)
+    ax2.plot(N_range, d_h_100, 'k-o', label=r'Lateral Displacement $\delta_h$')
+    ax2.axhline(d_y3 * 1000, color='r', linestyle='--', label=r'Yield Limit $\delta_{yield}$')
+    ax2.set_xlabel("Number of Piles in Group, N")
+    ax2.set_ylabel("Lateral Displacement, δ (mm)")
+    ax2.set_title("D = 1.00m Tubular Steel Piles")
+    ax2.set_ylim(0, 100)
+    ax2.grid(True, linestyle=':')
+    ax2.legend()
+
+    st.pyplot(fig2)
